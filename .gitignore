@@ -1,0 +1,30 @@
+# Build output
+bin/
+obj/
+
+# Logs
+Logs/
+
+# Game state dumps
+Dumps/
+
+# Research notes
+Research/
+
+# IDE / editor
+.vs/
+.idea/
+*.user
+*.suo
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Deploy
+deploy.bat
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
