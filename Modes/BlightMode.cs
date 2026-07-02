@@ -651,7 +651,9 @@ namespace AutoExile.Modes
             }
 
             var sweepDelay = _settings.DelayToSearchMonster.Value;
-            if ((DateTime.Now - _phaseStartTime).TotalSeconds > sweepDelay)
+            var elapsed = (DateTime.Now - _phaseStartTime).TotalSeconds;
+
+            if (elapsed > sweepDelay)
             {
                 // Always enter sweep after delay — monsters may exist beyond render range
                 // even if AliveMonsterCount == 0. Sweep patrols lanes to find them.
@@ -659,6 +661,8 @@ namespace AutoExile.Modes
                 EnterSweepPhase();
                 return;
             }
+
+            string timerStr = $"[{elapsed:F0}/{sweepDelay:F0}s]";
 
             // Timer is done — prioritize combat over tower actions.
             // If nearby monsters exist, cancel tower actions and let combat positioning
@@ -668,12 +672,12 @@ namespace AutoExile.Modes
             {
                 if (_towerAction != null)
                     CancelTowerAction(ctx);
-                StatusText = $"Fighting — {ctx.Combat.NearbyMonsterCount} nearby, {_blight.AliveMonsterCount} alive";
+                StatusText = $"Fighting {timerStr} — {ctx.Combat.NearbyMonsterCount} nearby, {_blight.AliveMonsterCount} alive";
             }
             else
             {
                 TickTowerLoop(ctx);
-                StatusText = $"Waiting — {_blight.AliveMonsterCount} monsters alive";
+                StatusText = $"Waiting {timerStr} — " + StatusText;
             }
         }
 
