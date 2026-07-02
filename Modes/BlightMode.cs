@@ -354,8 +354,8 @@ namespace AutoExile.Modes
 
             if (elapsed > 30)
             {
-                StatusText = "No pump found — timeout";
-                _phase = BlightPhase.Done;
+                StatusText = "No pump found — timeout, exiting map";
+                EnterExitMapPhase(ctx);
             }
         }
 
@@ -405,8 +405,8 @@ namespace AutoExile.Modes
                 var success = ctx.Navigation.NavigateTo(ctx.Game, _blight.PumpPosition.Value);
                 if (!success)
                 {
-                    StatusText = "No path to pump";
-                    _phase = BlightPhase.Done;
+                    StatusText = "No path to pump — exiting map";
+                    EnterExitMapPhase(ctx);
                     return;
                 }
             }
@@ -461,8 +461,8 @@ namespace AutoExile.Modes
 
             if (_pumpClickAttempts >= MaxPumpClickAttempts)
             {
-                StatusText = $"Failed to start encounter after {MaxPumpClickAttempts} click attempts";
-                _phase = BlightPhase.Done;
+                StatusText = $"Failed to start encounter after {MaxPumpClickAttempts} click attempts — exiting map";
+                EnterExitMapPhase(ctx);
                 return;
             }
 
@@ -500,8 +500,8 @@ namespace AutoExile.Modes
 
             if ((DateTime.Now - _phaseStartTime).TotalSeconds > 30)
             {
-                StatusText = "Timeout starting encounter";
-                _phase = BlightPhase.Done;
+                StatusText = "Timeout starting encounter — exiting map";
+                EnterExitMapPhase(ctx);
             }
         }
 
