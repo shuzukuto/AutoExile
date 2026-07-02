@@ -643,9 +643,6 @@ namespace AutoExile
             [Menu("Tower Approach Distance", "Navigate this close to towers before clicking — close enough to see full build/upgrade UI (grid units).")]
             public RangeNode<float> TowerApproachDistance { get; set; } = new RangeNode<float>(25f, 10f, 60f);
 
-            [Menu("Sweep Delay After Timer (s)", "Wait this long after timer ends before starting sweep (mobs still spawning).")]
-            public RangeNode<float> SweepDelayAfterTimerSeconds { get; set; } = new RangeNode<float>(30f, 5f, 60f);
-
             [Menu("Sweep Timeout (s)", "Max time in sweep phase with no monsters found before giving up. Resets when monsters are found or killed.")]
             public RangeNode<float> SweepTimeoutSeconds { get; set; } = new RangeNode<float>(180f, 60f, 600f);
 
@@ -654,6 +651,9 @@ namespace AutoExile
 
             [Menu("Sweep Pump Radius", "Grid distance from pump considered 'near pump' — resets the return timer when inside this radius.")]
             public RangeNode<float> SweepPumpRadius { get; set; } = new RangeNode<float>(80f, 30f, 150f);
+
+            [Menu("Delay to Search Monster (s)", "Wait this long after timer ends before leaving defense point to sweep.")]
+            public RangeNode<float> DelayToSearchMonster { get; set; } = new RangeNode<float>(30f, 5f, 120f);
 
             public TowerTypeSettings Chilling { get; set; } = new TowerTypeSettings(5, canStack: false, tier3Branch: "None");
             public TowerTypeSettings Fireball { get; set; } = new TowerTypeSettings(4, canStack: true, tier3Branch: "Left");

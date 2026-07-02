@@ -650,7 +650,7 @@ namespace AutoExile.Modes
                 return;
             }
 
-            var sweepDelay = _settings.SweepDelayAfterTimerSeconds.Value;
+            var sweepDelay = _settings.DelayToSearchMonster.Value;
             if ((DateTime.Now - _phaseStartTime).TotalSeconds > sweepDelay)
             {
                 // Always enter sweep after delay — monsters may exist beyond render range

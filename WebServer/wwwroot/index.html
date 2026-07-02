@@ -1258,8 +1258,9 @@ function renderModeTab(container, modeName) {
       const blightTitle = document.createElement('div'); blightTitle.className='section-divider'; blightTitle.textContent='Blight'; blightDiv.appendChild(blightTitle);
       addFieldsTo(blightDiv, [['blight.ignoreCurrency'],['blight.towerBuildRadius'],['blight.towerBuildCooldownMs'],
         ['blight.towerClickCooldownMs'],['blight.towerApproachDistance'],
-        ['blight.sweepDelayAfterTimerSeconds'],['blight.sweepTimeoutSeconds'],
-        ['blight.sweepPumpReturnSeconds'],['blight.sweepPumpRadius']]);
+        ['blight.sweepTimeoutSeconds'],
+        ['blight.sweepPumpReturnSeconds'],['blight.sweepPumpRadius'],
+        ['blight.delayToSearchMonster']]);
       const towerLabel = document.createElement('div'); towerLabel.className='section-divider'; towerLabel.textContent='Tower Priorities'; blightDiv.appendChild(towerLabel);
       blightDiv.appendChild(renderTowerTable());
       container.appendChild(blightDiv);
