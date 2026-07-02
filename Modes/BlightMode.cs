@@ -662,8 +662,6 @@ namespace AutoExile.Modes
                 return;
             }
 
-            string timerStr = $"[{elapsed:F0}/{sweepDelay:F0}s]";
-
             // Timer is done — prioritize combat over tower actions.
             // If nearby monsters exist, cancel tower actions and let combat positioning
             // take over (Combat.Tick runs before this, but tower navigation overrides
@@ -672,12 +670,12 @@ namespace AutoExile.Modes
             {
                 if (_towerAction != null)
                     CancelTowerAction(ctx);
-                StatusText = $"Fighting {timerStr} — {ctx.Combat.NearbyMonsterCount} nearby, {_blight.AliveMonsterCount} alive";
+                StatusText = $"Fighting — {ctx.Combat.NearbyMonsterCount} nearby, {_blight.AliveMonsterCount} alive";
             }
             else
             {
                 TickTowerLoop(ctx);
-                StatusText = $"Waiting {timerStr} — " + StatusText;
+                StatusText = $"Waiting — " + StatusText;
             }
         }
 
@@ -1387,6 +1385,14 @@ namespace AutoExile.Modes
             if (_blight.IsEncounterActive)
             {
                 g.DrawText($"Timer: {_blight.CountdownText}", new Vector2(hudX, hudY), SharpDX.Color.Cyan);
+                hudY += lineH;
+            }
+
+            if (_phase == BlightPhase.WaitForCompletion)
+            {
+                var sweepDelay = _settings.DelayToSearchMonster.Value;
+                var elapsed = (DateTime.Now - _phaseStartTime).TotalSeconds;
+                g.DrawText($"Delay to search monster: {elapsed:F0} / {sweepDelay:F0}s", new Vector2(hudX, hudY), SharpDX.Color.Cyan);
                 hudY += lineH;
             }
 
