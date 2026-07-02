@@ -54,6 +54,7 @@ namespace AutoExile.Modes
 
         // Pump click verification
         private int _pumpClickAttempts;
+        private bool _pumpRetryAttempted;
         private DateTime _lastPumpClickAt = DateTime.MinValue;
         private const int MaxPumpClickAttempts = 6;
         private const float PumpClickVerifyDelayMs = 1500f; // wait after click before retrying
@@ -396,6 +397,7 @@ namespace AutoExile.Modes
                 _phase = BlightPhase.StartEncounter;
                 _phaseStartTime = DateTime.Now;
                 _pumpClickAttempts = 0;
+                _pumpRetryAttempted = false;
                 StatusText = "Near pump — starting encounter";
                 return;
             }
@@ -461,6 +463,21 @@ namespace AutoExile.Modes
 
             if (_pumpClickAttempts >= MaxPumpClickAttempts)
             {
+                if (!_pumpRetryAttempted)
+                {
+                    _pumpRetryAttempted = true;
+                    _pumpClickAttempts = 0;
+                    _phaseStartTime = DateTime.Now;
+
+                    var playerPos = ctx.Game.Player.GridPosNum;
+                    var pumpPos = pump?.GridPosNum ?? _blight.PumpPosition ?? playerPos;
+                    var offset = Vector2.Normalize(playerPos - pumpPos);
+                    if (offset.LengthSquared() < 0.1f) offset = new Vector2(1, 1);
+
+                    ctx.Navigation.NavigateTo(ctx.Game, playerPos + offset * 30f);
+                    StatusText = "Failed to click pump — repositioning for retry";
+                    return;
+                }
                 StatusText = $"Failed to start encounter after {MaxPumpClickAttempts} click attempts — exiting map";
                 EnterExitMapPhase(ctx);
                 return;
@@ -500,6 +517,21 @@ namespace AutoExile.Modes
 
             if ((DateTime.Now - _phaseStartTime).TotalSeconds > 30)
             {
+                if (!_pumpRetryAttempted)
+                {
+                    _pumpRetryAttempted = true;
+                    _pumpClickAttempts = 0;
+                    _phaseStartTime = DateTime.Now;
+
+                    var playerPos = ctx.Game.Player.GridPosNum;
+                    var pumpPos = pump?.GridPosNum ?? _blight.PumpPosition ?? playerPos;
+                    var offset = Vector2.Normalize(playerPos - pumpPos);
+                    if (offset.LengthSquared() < 0.1f) offset = new Vector2(1, 1);
+
+                    ctx.Navigation.NavigateTo(ctx.Game, playerPos + offset * 30f);
+                    StatusText = "Timeout starting encounter — repositioning for retry";
+                    return;
+                }
                 StatusText = "Timeout starting encounter — exiting map";
                 EnterExitMapPhase(ctx);
             }
