@@ -40,6 +40,7 @@ namespace AutoExile.Modes
         private Vector2? _currentChestTarget;
         private DateTime _chestNavStartedAt = DateTime.MinValue;
         private const float ChestNavTimeoutSeconds = 30f;
+        private HashSet<Vector2> _unvisitedLaneEnds = new();
 
         // Sweep state
         private bool _sweepWasSearching;
@@ -542,8 +543,9 @@ namespace AutoExile.Modes
             var gc = ctx.Game;
             try
             {
-                var skipButton = gc.IngameState.IngameUi.LeagueMechanicButtons?.GetChildAtIndex(2);
-                if (skipButton != null && skipButton.IsVisible)
+                var mechanicButtons = gc.IngameState.IngameUi.LeagueMechanicButtons;
+                var skipButton = mechanicButtons?.Children.FirstOrDefault(c => c != null && c.IsVisible);
+                if (skipButton != null)
                 {
                     var rect = skipButton.GetClientRect();
                     var center = new Vector2(rect.Center.X, rect.Center.Y);
@@ -903,15 +905,14 @@ namespace AutoExile.Modes
                 _sweepCombatEngageTime = DateTime.MinValue;
                 _sweepCombatEngageCount = 0;
 
-                // Find the monster closest to defense point (biggest threat).
-                // The return-to-pump timer (SweepPumpReturnSeconds) prevents staying away too long.
-                var nearestToPumpPos = FindMonsterClosestToDefense(gc, defensePos, ctx.Combat.BlacklistedEnemies);
+                // Find the closest alive monster to chase.
+                var nearestToPumpPos = FindSweepTargetMonster(gc, playerPos, ctx.Combat.BlacklistedEnemies);
                 if (nearestToPumpPos.HasValue)
                 {
                     var monsterDist = Vector2.Distance(playerPos, nearestToPumpPos.Value);
                     if (monsterDist > 20f && !ctx.Navigation.IsNavigating)
                         ctx.Navigation.NavigateTo(gc, nearestToPumpPos.Value);
-                    StatusText = $"Sweep: chasing monster near pump (dist: {monsterDist:F0}, {ctx.Combat.CachedMonsterCount} alive)";
+                    StatusText = $"Sweep: chasing monster (dist: {monsterDist:F0}, {ctx.Combat.CachedMonsterCount} alive)";
                     return;
                 }
             }
@@ -981,12 +982,12 @@ namespace AutoExile.Modes
         }
 
         /// <summary>
-        /// Find the alive hostile monster closest to the defense point (biggest threat).
+        /// Find the alive hostile monster closest to the player so we clear smoothly as we go.
         /// Uses OnlyValidEntities (entity list), not blight-specific cache.
         /// </summary>
-        private static Vector2? FindMonsterClosestToDefense(GameController gc, Vector2 defensePos, HashSet<string> enemyBlacklist)
+        private static Vector2? FindSweepTargetMonster(GameController gc, Vector2 playerPos, HashSet<string> enemyBlacklist)
         {
-            float bestDist = float.MaxValue;
+            float bestScore = float.MaxValue;
             Vector2? bestPos = null;
 
             foreach (var entity in gc.EntityListWrapper.OnlyValidEntities)
@@ -996,10 +997,10 @@ namespace AutoExile.Modes
                 if (enemyBlacklist.Count > 0 && !string.IsNullOrEmpty(entity.RenderName) &&
                     enemyBlacklist.Contains(entity.RenderName)) continue;
 
-                var dist = Vector2.Distance(entity.GridPosNum, defensePos);
-                if (dist < bestDist)
+                var distToPlayer = Vector2.Distance(entity.GridPosNum, playerPos);
+                if (distToPlayer < bestScore)
                 {
-                    bestDist = dist;
+                    bestScore = distToPlayer;
                     bestPos = entity.GridPosNum;
                 }
             }
@@ -1022,6 +1023,15 @@ namespace AutoExile.Modes
             _currentChestTarget = null;
             _lootTracker.Reset();
             _lastEmptyScanAt = DateTime.MinValue;
+
+            _unvisitedLaneEnds.Clear();
+            foreach (var lane in _blight.LaneTracker.Lanes)
+            {
+                if (lane.Count > 0)
+                {
+                    _unvisitedLaneEnds.Add(lane[lane.Count - 1]);
+                }
+            }
         }
 
         private void TickOpenChests(BotContext ctx, InteractionResult interactionResult)
@@ -1152,6 +1162,36 @@ namespace AutoExile.Modes
                 }
             }
 
+            // Priority 4: Navigate to unvisited lane ends to discover off-screen chests
+            if (_unvisitedLaneEnds.Count > 0)
+            {
+                _unvisitedLaneEnds.RemoveWhere(pos => Vector2.Distance(playerPos, pos) < 50f);
+
+                if (_unvisitedLaneEnds.Count > 0)
+                {
+                    Vector2? nearestLaneEnd = null;
+                    float bestDist = float.MaxValue;
+                    foreach (var pos in _unvisitedLaneEnds)
+                    {
+                        var d = Vector2.Distance(playerPos, pos);
+                        if (d < bestDist) { bestDist = d; nearestLaneEnd = pos; }
+                    }
+
+                    if (nearestLaneEnd.HasValue)
+                    {
+                        if (!ctx.Navigation.IsNavigating)
+                        {
+                            _lastEmptyScanAt = DateTime.MinValue; // Keep grace period reset
+                            var pathFound = ctx.Navigation.NavigateTo(gc, nearestLaneEnd.Value);
+                            if (!pathFound)
+                                _unvisitedLaneEnds.Remove(nearestLaneEnd.Value); // Unreachable
+                        }
+                        StatusText = $"Walking to lane ends to discover chests ({_unvisitedLaneEnds.Count} remaining)";
+                        return;
+                    }
+                }
+            }
+
             // Grace period
             if (_lastEmptyScanAt == DateTime.MinValue)
                 _lastEmptyScanAt = DateTime.Now;
@@ -1263,7 +1303,7 @@ namespace AutoExile.Modes
             var g = ctx.Graphics;
 
             // --- HUD ---
-            var hudY = 100f;
+            var hudY = 160f;
             var hudX = 20f;
             var lineH = 16f;
 
@@ -1324,7 +1364,7 @@ namespace AutoExile.Modes
             // Pump entity (clickable)
             if (_blight.PumpPosition.HasValue)
             {
-                var pumpWorld = Systems.Pathfinding.GridToWorld3D(gc, _blight.PumpPosition.Value);
+                var pumpWorld = _blight.PumpWorldPos ?? Systems.Pathfinding.GridToWorld3D(gc, _blight.PumpPosition.Value);
                 g.DrawText("PUMP", cam.WorldToScreen(pumpWorld), SharpDX.Color.Yellow);
                 g.DrawCircleInWorld(pumpWorld, 30f, SharpDX.Color.Yellow, 2f);
 
@@ -1335,7 +1375,7 @@ namespace AutoExile.Modes
             // Defense point (lane hub — where monsters converge)
             if (_blight.DefensePosition.HasValue && _blight.DefensePosition != _blight.PumpPosition)
             {
-                var defWorld = Systems.Pathfinding.GridToWorld3D(gc, _blight.DefensePosition.Value);
+                var defWorld = _blight.DefenseWorldPos ?? Systems.Pathfinding.GridToWorld3D(gc, _blight.DefensePosition.Value);
                 g.DrawText("DEFEND", cam.WorldToScreen(defWorld), SharpDX.Color.Cyan);
                 g.DrawCircleInWorld(defWorld, 30f, SharpDX.Color.Cyan, 2f);
             }
@@ -1352,7 +1392,7 @@ namespace AutoExile.Modes
             // Cached portal
             if (_blight.PortalPosition.HasValue)
             {
-                var portalWorld = Systems.Pathfinding.GridToWorld3D(gc, _blight.PortalPosition.Value);
+                var portalWorld = _blight.PortalWorldPos ?? Systems.Pathfinding.GridToWorld3D(gc, _blight.PortalPosition.Value);
                 var portalScreen = cam.WorldToScreen(portalWorld);
                 g.DrawText("PORTAL", portalScreen + new Vector2(-20, -15), SharpDX.Color.Aqua);
                 g.DrawCircleInWorld(portalWorld, 20f, SharpDX.Color.Aqua, 1.5f);

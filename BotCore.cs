@@ -830,6 +830,14 @@ namespace AutoExile
                 Graphics.DrawText(recText, new Vector2(100, 116), SharpDX.Color.Red);
             }
 
+            // Coordinates debug overlay
+            var playerGrid = GameController.Player?.GridPosNum ?? Vector2.Zero;
+            var dest = _navigation.Destination;
+            var destStr = dest.HasValue ? $"{dest.Value.X:F1}, {dest.Value.Y:F1}" : "None";
+            var posText = $"Pos: {playerGrid.X:F1}, {playerGrid.Y:F1}  |  Dest: {destStr}";
+            var posY = 116 + (_humanRecorder.IsRecording ? 20 : 0);
+            Graphics.DrawText(posText, new Vector2(100, posY), SharpDX.Color.Cyan);
+
             // Loot tracker overlay (top-right area)
             var winWidth = GameController.Window.GetWindowRectangle().Width;
             _lootTracker.Render(Graphics, new Vector2(winWidth - 250, 80));

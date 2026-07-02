@@ -25,6 +25,7 @@ namespace AutoExile.Systems
         /// analysis only; defense positioning uses the pump position directly via BlightState.
         /// </summary>
         public Vector2? HubPosition { get; private set; }
+        public Vector3? HubWorldPos { get; private set; }
 
         // Per-lane intelligence (indices match Lanes list)
         public float[] LaneThreat { get; private set; } = Array.Empty<float>();
@@ -112,14 +113,14 @@ namespace AutoExile.Systems
 
         private void ReconstructLanes(GameController gc)
         {
-            var pathways = new List<(long Id, Vector2 Pos)>();
+            var pathways = new List<(long Id, Vector2 Pos, Vector3 WorldPos)>();
             foreach (var entity in gc.EntityListWrapper.OnlyValidEntities)
             {
                 if (entity.Path == "Metadata/Terrain/Leagues/Blight/Objects/BlightPathway")
                 {
                     var pos = entity.GridPosNum;
                     if (pos.X > 0 && pos.Y > 0)
-                        pathways.Add((entity.Id, pos));
+                        pathways.Add(((long)entity.Id, pos, new Vector3(entity.Pos.X, entity.Pos.Y, entity.Pos.Z)));
                 }
             }
 
@@ -183,11 +184,12 @@ namespace AutoExile.Systems
             ComputeHubPosition(pathways);
         }
 
-        private void ComputeHubPosition(List<(long Id, Vector2 Pos)> pathways)
+        private void ComputeHubPosition(List<(long Id, Vector2 Pos, Vector3 WorldPos)> pathways)
         {
             if (!PumpPosition.HasValue || pathways.Count == 0)
             {
                 HubPosition = null;
+                HubWorldPos = null;
                 return;
             }
 
@@ -198,17 +200,20 @@ namespace AutoExile.Systems
             // closest to the pump — that's where monsters converge.
             float bestDist = float.MaxValue;
             Vector2? bestPos = null;
-            foreach (var (_, pos) in pathways)
+            Vector3? bestWorldPos = null;
+            foreach (var (_, pos, worldPos) in pathways)
             {
                 var dist = Vector2.Distance(pos, pump);
                 if (dist < bestDist)
                 {
                     bestDist = dist;
                     bestPos = pos;
+                    bestWorldPos = worldPos;
                 }
             }
 
             HubPosition = bestPos;
+            HubWorldPos = bestWorldPos;
         }
 
         /// <summary>

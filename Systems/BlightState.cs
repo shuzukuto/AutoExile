@@ -18,6 +18,7 @@ namespace AutoExile.Systems
     {
         // Pump tracking (cached as grid position + ID, not entity ref)
         public Vector2? PumpPosition { get; private set; }
+        public Vector3? PumpWorldPos { get; private set; }
         public long PumpEntityId { get; private set; }
         public bool IsPumpInRange { get; private set; }
 
@@ -28,6 +29,7 @@ namespace AutoExile.Systems
         /// PumpPosition if lanes haven't been computed yet.
         /// </summary>
         public Vector2? DefensePosition => LaneTracker.HubPosition ?? PumpPosition;
+        public Vector3? DefenseWorldPos => LaneTracker.HubWorldPos ?? PumpWorldPos;
 
         // Encounter state (derived from pump StateMachine)
         public bool IsEncounterActive { get; set; }
@@ -74,6 +76,8 @@ namespace AutoExile.Systems
 
         // Portal tracking — cache position when first seen in map for exit navigation
         public Vector2? PortalPosition { get; set; }
+        public Vector3? PortalWorldPos { get; set; }
+        public long? PortalEntityId { get; private set; }
 
         // Map completion tracking
         public bool MapComplete { get; set; }
@@ -144,6 +148,8 @@ namespace AutoExile.Systems
             _prevTowerUpgradeAt = DateTime.MinValue;
             _pumpNonTargetableTicks = 0;
             PortalPosition = null;
+            PortalWorldPos = null;
+            PortalEntityId = null;
             MapComplete = false;
             DeathCount = 0;
         }
@@ -444,12 +450,29 @@ namespace AutoExile.Systems
                     continue;
                 }
 
+                // Actively track Portal
+                if (entity.Type == EntityType.TownPortal)
+                {
+                    PortalPosition = entity.GridPosNum;
+                    PortalWorldPos = new Vector3(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
+                    PortalEntityId = entity.Id;
+                }
+
+                // Actively track Pump (even if ID changed)
+                if (entity.Type == EntityType.IngameIcon && entity.Path != null && entity.Path.EndsWith("/BlightPump"))
+                {
+                    PumpEntityId = entity.Id;
+                }
+
                 // Pump StateMachine
                 if (entity.Id == PumpEntityId)
                 {
                     var pos = entity.GridPosNum;
                     if (!PumpPosition.HasValue || Vector2.Distance(pos, PumpPosition.Value) < PumpRejectDistance)
+                    {
                         PumpPosition = pos;
+                        PumpWorldPos = new Vector3(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
+                    }
 
                     IsPumpInRange = true;
                     if (entity.TryGetComponent<StateMachine>(out var states))

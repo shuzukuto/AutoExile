@@ -802,6 +802,8 @@ namespace AutoExile.Systems
             IsMovementSuspended = false;
         }
 
+        private static DateTime _movementSuspendedAt = DateTime.MinValue;
+
         /// <summary>
         /// Suspend movement temporarily for a discrete action (click, targeted skill).
         /// Before releasing the move key, snaps the cursor to the player's screen position
@@ -827,6 +829,7 @@ namespace AutoExile.Systems
 
             SendKeyUp(_movementKey, "suspend");
             IsMovementSuspended = true;
+            _movementSuspendedAt = DateTime.Now;
         }
 
         /// <summary>
@@ -1106,12 +1109,26 @@ namespace AutoExile.Systems
         /// <summary>Max random pixel offset applied to final cursor landing position.</summary>
         private const float LandingJitterPx = 3f;
 
+        private static async Task SettleMovementIfSuspended()
+        {
+            if (_movementSuspendedAt != DateTime.MinValue)
+            {
+                var elapsed = (DateTime.Now - _movementSuspendedAt).TotalMilliseconds;
+                if (elapsed < 150)
+                {
+                    await Task.Delay((int)(150 - elapsed));
+                }
+                _movementSuspendedAt = DateTime.MinValue;
+            }
+        }
+
         /// <summary>
         /// Interpolate cursor from current position to target over a distance-proportional duration.
         /// Path has slight random perpendicular jitter for organic movement.
         /// </summary>
         private static async Task MoveCursorTo(Vector2 target)
         {
+            await SettleMovementIfSuspended();
             var mp = Input.MousePosition;
             var start = new Vector2(mp.X, mp.Y);
             var delta = target - start;

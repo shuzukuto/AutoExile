@@ -1331,7 +1331,7 @@ namespace AutoExile.Modes
             var g = ctx.Graphics;
 
             // --- HUD ---
-            var hudY = 100f;
+            var hudY = 160f;
             var hudX = 20f;
             var lineH = 16f;
 

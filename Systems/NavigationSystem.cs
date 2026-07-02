@@ -485,7 +485,7 @@ namespace AutoExile.Systems
 
                 // Try dash-for-speed on long straight segments (not in town — skills don't work there)
                 if (inTown || WalkOnly || !TryDashForSpeed(gc, playerGrid, windowRect))
-                    ExecuteWalk(screenPos, windowRect);
+                    ExecuteWalk(screenPos, windowRect, pushOut: !isLastWaypoint);
             }
         }
 
@@ -510,7 +510,7 @@ namespace AutoExile.Systems
         /// <summary>Minimum screen distance (pixels) from center for effective move-clicks.</summary>
         internal const float MinScreenDist = 40f;
 
-        private void ExecuteWalk(Vector2 screenPos, SharpDX.RectangleF windowRect)
+        private void ExecuteWalk(Vector2 screenPos, SharpDX.RectangleF windowRect, bool pushOut = true)
         {
             var center = new Vector2(windowRect.Width / 2f, windowRect.Height / 2f);
 
@@ -521,7 +521,7 @@ namespace AutoExile.Systems
                 // If target is too close to screen center, push it outward along the same
                 // direction so the click produces meaningful movement in PoE.
                 var dir = screenPos - center;
-                if (dir.Length() < MinScreenDist)
+                if (pushOut && dir.Length() < MinScreenDist)
                 {
                     if (dir.Length() < 1f) return; // target is exactly on player
                     screenPos = center + Vector2.Normalize(dir) * MinScreenDist;
@@ -577,7 +577,7 @@ namespace AutoExile.Systems
             }
             else
             {
-                ExecuteWalk(screenPos, windowRect);
+                ExecuteWalk(screenPos, windowRect, pushOut: true);
             }
         }
 
@@ -924,7 +924,7 @@ namespace AutoExile.Systems
 
             var screenPos = GridToScreen(gc, bestBacktrack.Value);
             var windowRect = gc.Window.GetWindowRectangle();
-            ExecuteWalk(screenPos, windowRect);
+            ExecuteWalk(screenPos, windowRect, pushOut: false);
             LastRecoveryAction = $"Backtrack ({Vector2.Distance(playerGrid, bestBacktrack.Value):F0}g, {currentDistToDest - bestDistToDest:F0}g closer)";
             return true;
         }
@@ -960,7 +960,7 @@ namespace AutoExile.Systems
             var screenPos = GridToScreen(gc, nudgeTarget);
             var windowRect = gc.Window.GetWindowRectangle();
 
-            ExecuteWalk(screenPos, windowRect);
+            ExecuteWalk(screenPos, windowRect, pushOut: false);
             LastRecoveryAction = $"Escape probe ({probeDistance:F0}g, attempt #{_stuckAtSameSpotCount})";
         }
 
@@ -1155,7 +1155,7 @@ namespace AutoExile.Systems
 
             // Continuous movement doesn't need the action gate
             var screenPos = GridToScreen(gc, gridTarget);
-            ExecuteWalk(screenPos, windowRect);
+            ExecuteWalk(screenPos, windowRect, pushOut: false);
             return true;
         }
 
@@ -1214,7 +1214,7 @@ namespace AutoExile.Systems
         /// Update the destination of an active navigation for a moving target.
         /// All positions in grid coordinates.
         /// </summary>
-        public bool UpdateDestination(GameController gc, Vector2 gridTarget, float driftThreshold = 14f)
+        public bool UpdateDestination(GameController gc, Vector2 gridTarget, float driftThreshold = 8f)
         {
             if (!IsNavigating || CurrentNavPath.Count == 0)
                 return false;

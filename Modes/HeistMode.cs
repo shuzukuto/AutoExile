@@ -1392,7 +1392,7 @@ namespace AutoExile.Modes
 
             // ═══ HUD Panel ═══
             var hudX = 20f;
-            var hudY = 100f;
+            var hudY = 160f;
             var lineH = 16f;
 
             g.DrawText("=== HEIST ===", new Vector2(hudX, hudY), SharpDX.Color.Cyan);
