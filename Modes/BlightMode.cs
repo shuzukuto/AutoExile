@@ -1435,9 +1435,6 @@ namespace AutoExile.Modes
                 var pumpWorld = _blight.PumpWorldPos ?? Systems.Pathfinding.GridToWorld3D(gc, _blight.PumpPosition.Value);
                 g.DrawText("PUMP", cam.WorldToScreen(pumpWorld), SharpDX.Color.Yellow);
                 g.DrawCircleInWorld(pumpWorld, 30f, SharpDX.Color.Yellow, 2f);
-
-                float buildRadiusWorld = _settings.TowerBuildRadius.Value * Systems.Pathfinding.GridToWorld;
-                g.DrawCircleInWorld(pumpWorld, buildRadiusWorld, new SharpDX.Color(255, 200, 0, 40), 1.5f);
             }
 
             // Defense point (lane hub — where monsters converge)
@@ -1446,6 +1443,18 @@ namespace AutoExile.Modes
                 var defWorld = _blight.DefenseWorldPos ?? Systems.Pathfinding.GridToWorld3D(gc, _blight.DefensePosition.Value);
                 g.DrawText("DEFEND", cam.WorldToScreen(defWorld), SharpDX.Color.Cyan);
                 g.DrawCircleInWorld(defWorld, 30f, SharpDX.Color.Cyan, 2f);
+            }
+
+            // Tower Build Radius (centered on Defense or Pump fallback)
+            var buildCenter = _blight.DefensePosition ?? _blight.PumpPosition;
+            if (buildCenter.HasValue)
+            {
+                var buildCenterWorld = (_blight.DefensePosition != null)
+                    ? (_blight.DefenseWorldPos ?? Systems.Pathfinding.GridToWorld3D(gc, _blight.DefensePosition.Value))
+                    : (_blight.PumpWorldPos ?? Systems.Pathfinding.GridToWorld3D(gc, _blight.PumpPosition.Value));
+
+                float buildRadiusWorld = _settings.TowerBuildRadius.Value * Systems.Pathfinding.GridToWorld;
+                g.DrawCircleInWorld(buildCenterWorld, buildRadiusWorld, new SharpDX.Color(255, 200, 0, 40), 1.5f);
             }
 
             // Active tower target
