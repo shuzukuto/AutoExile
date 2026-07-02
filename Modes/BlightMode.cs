@@ -41,6 +41,7 @@ namespace AutoExile.Modes
         private DateTime _chestNavStartedAt = DateTime.MinValue;
         private const float ChestNavTimeoutSeconds = 30f;
         private HashSet<Vector2> _unvisitedLaneEnds = new();
+        private List<Vector2> _visitedLaneAreas = new();
 
         // Sweep state
         private bool _sweepWasSearching;
@@ -1069,6 +1070,7 @@ namespace AutoExile.Modes
             _lastEmptyScanAt = DateTime.MinValue;
 
             _unvisitedLaneEnds.Clear();
+            _visitedLaneAreas.Clear();
             foreach (var lane in _blight.LaneTracker.Lanes)
             {
                 if (lane.Count > 0)
@@ -1207,9 +1209,31 @@ namespace AutoExile.Modes
             }
 
             // Priority 4: Navigate to unvisited lane ends to discover off-screen chests
+            
+            // 4a. Update unvisited lane ends with newly discovered pathway ends
+            foreach (var lane in _blight.LaneTracker.Lanes)
+            {
+                if (lane.Count > 0)
+                {
+                    var endPos = lane[lane.Count - 1];
+                    // If this endPos is not near any visited area, and not already in unvisited, add it
+                    if (!_visitedLaneAreas.Any(v => Vector2.Distance(v, endPos) < 60f) &&
+                        !_unvisitedLaneEnds.Any(u => Vector2.Distance(u, endPos) < 20f))
+                    {
+                        _unvisitedLaneEnds.Add(endPos);
+                    }
+                }
+            }
+
             if (_unvisitedLaneEnds.Count > 0)
             {
-                _unvisitedLaneEnds.RemoveWhere(pos => Vector2.Distance(playerPos, pos) < 50f);
+                // 4b. Remove areas we are currently standing in, and mark them as visited
+                var reached = _unvisitedLaneEnds.Where(pos => Vector2.Distance(playerPos, pos) < 50f).ToList();
+                foreach (var r in reached)
+                {
+                    _unvisitedLaneEnds.Remove(r);
+                    _visitedLaneAreas.Add(r);
+                }
 
                 if (_unvisitedLaneEnds.Count > 0)
                 {
