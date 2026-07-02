@@ -392,7 +392,7 @@ namespace AutoExile.Systems
 
             long bestId = 0;
             float bestScore = float.MinValue;
-            var pumpPos = _blight.PumpPosition ?? Vector2.Zero;
+            var centerPos = _blight.DefensePosition ?? _blight.PumpPosition ?? Vector2.Zero;
             var playerGridPos = gc.Player.GridPosNum;
             var priorityOrder = _config.GetPriorityOrder();
             if (priorityOrder.Count == 0) return 0;
@@ -402,8 +402,8 @@ namespace AutoExile.Systems
             {
                 if (cf.IsBuilt) continue;
 
-                // Must be within build radius of pump (grid units)
-                if (pumpPos != Vector2.Zero && Vector2.Distance(cf.Position, pumpPos) > buildRadius)
+                // Must be within build radius of defense center (grid units)
+                if (centerPos != Vector2.Zero && Vector2.Distance(cf.Position, centerPos) > buildRadius)
                     continue;
 
                 // Skip foundations where no tower type is viable (all filtered by spread/nearby rules)
@@ -472,7 +472,7 @@ namespace AutoExile.Systems
         {
             long bestId = 0;
             float bestScore = -1;
-            var pumpPos = _blight.PumpPosition ?? Vector2.Zero;
+            var centerPos = _blight.DefensePosition ?? _blight.PumpPosition ?? Vector2.Zero;
             var playerGridPos = gc.Player.GridPosNum;
 
             foreach (var ct in _blight.CachedTowers.Values)
@@ -504,8 +504,8 @@ namespace AutoExile.Systems
                 if (!_config.IgnoreCurrency.Value && _blight.Currency < GetCostForTier(ct.Tier))
                     continue;
 
-                // Must be within build radius of pump (grid units)
-                if (pumpPos != Vector2.Zero && Vector2.Distance(ct.Position, pumpPos) > _config.TowerBuildRadius.Value)
+                // Must be within build radius of defense center (grid units)
+                if (centerPos != Vector2.Zero && Vector2.Distance(ct.Position, centerPos) > _config.TowerBuildRadius.Value)
                     continue;
 
                 // Score: higher danger lanes + lower tier = higher priority
