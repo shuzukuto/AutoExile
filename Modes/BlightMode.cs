@@ -884,6 +884,8 @@ namespace AutoExile.Modes
                 else
                 {
                     _sweepWasSearching = false;
+                    if (ctx.Navigation.IsNavigating)
+                        ctx.Navigation.Stop(gc);
                     // CombatSystem handles fighting + positioning (SuppressPositioning = false above)
                     StatusText = $"Sweep: fighting ({ctx.Combat.NearbyMonsterCount} nearby, {ctx.Combat.CachedMonsterCount} total)";
                 }
@@ -910,8 +912,18 @@ namespace AutoExile.Modes
                 if (nearestToPumpPos.HasValue)
                 {
                     var monsterDist = Vector2.Distance(playerPos, nearestToPumpPos.Value);
-                    if (monsterDist > 20f && !ctx.Navigation.IsNavigating)
-                        ctx.Navigation.NavigateTo(gc, nearestToPumpPos.Value);
+                    if (monsterDist > 20f)
+                    {
+                        bool needsUpdate = !ctx.Navigation.IsNavigating;
+                        if (!needsUpdate && ctx.Navigation.Destination.HasValue)
+                        {
+                            if (Vector2.Distance(ctx.Navigation.Destination.Value, nearestToPumpPos.Value) > 20f)
+                                needsUpdate = true;
+                        }
+
+                        if (needsUpdate)
+                            ctx.Navigation.NavigateTo(gc, nearestToPumpPos.Value);
+                    }
                     StatusText = $"Sweep: chasing monster (dist: {monsterDist:F0}, {ctx.Combat.CachedMonsterCount} alive)";
                     return;
                 }
