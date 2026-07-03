@@ -1,6 +1,2 @@
 Build failed:
-[11/06/2026 23:55:48, E:\Path of Exile\POE Tools\ExileApi\Plugins\Source\AutoExile\Systems\StashSystem.cs(960, 27)] CS0103: The name 'SafeReturnCursorItemToInventory' does not exist in the current context
-[11/06/2026 23:55:48, E:\Path of Exile\POE Tools\ExileApi\Plugins\Source\AutoExile\Systems\StashSystem.cs(999, 31)] CS0103: The name 'SafeReturnCursorItemToInventory' does not exist in the current context
-[11/06/2026 23:55:48, E:\Path of Exile\POE Tools\ExileApi\Plugins\Source\AutoExile\Systems\StashSystem.cs(1012, 31)] CS0103: The name 'SafeReturnCursorItemToInventory' does not exist in the current context
-[11/06/2026 23:55:48, E:\Path of Exile\POE Tools\ExileApi\Plugins\Source\AutoExile\Systems\StashSystem.cs(1137, 35)] CS0103: The name 'SafeReturnCursorItemToInventory' does not exist in the current context
-[11/06/2026 23:55:48, E:\Path of Exile\POE Tools\ExileApi\Plugins\Source\AutoExile\Systems\StashSystem.cs(1173, 31)] CS0103: The name 'SafeReturnCursorItemToInventory' does not exist in the current context
+[03/07/2026 12:30:49, C:\Program Files\dotnet\sdk\10.0.103\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.Sdk.targets(308, 5)] NETSDK1047: Assets file 'E:\Path of Exile\POE Tools\ExileApi\Plugins\Source\AutoExile\obj\project.assets.json' doesn't have a target for 'net10.0-windows/win-x64'. Ensure that restore has run and that you have included 'net10.0-windows' in the TargetFrameworks for your project. You may also need to include 'win-x64' in your project's RuntimeIdentifiers.

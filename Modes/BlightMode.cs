@@ -492,7 +492,7 @@ namespace AutoExile.Modes
                 return;
             }
 
-            if (pump.TryGetComponent<StateMachine>(out var states))
+            if (pump.TryGetComponent<StateMachine>(out var states) && states.States != null)
             {
                 bool readyToStart = false;
                 foreach (var s in states.States)
@@ -545,7 +545,7 @@ namespace AutoExile.Modes
         /// </summary>
         private static bool IsPumpActivated(Entity pump)
         {
-            if (!pump.TryGetComponent<StateMachine>(out var states))
+            if (!pump.TryGetComponent<StateMachine>(out var states) || states.States == null)
                 return false;
             foreach (var s in states.States)
             {
