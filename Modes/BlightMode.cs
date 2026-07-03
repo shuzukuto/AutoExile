@@ -372,7 +372,7 @@ namespace AutoExile.Modes
             if (_blight.IsEncounterActive)
             {
                 // Require positive proof: pump StateMachine "activated > 0", or pump gone + monsters
-                var pump = FindPumpEntity(ctx.Game);
+                var pump = FindPumpEntity(ctx);
                 bool confirmed = (pump != null && IsPumpActivated(pump))
                     || (pump == null && _blight.AliveMonsterCount > 5);
 
@@ -420,7 +420,7 @@ namespace AutoExile.Modes
         private void TickStartEncounter(BotContext ctx)
         {
             var gc = ctx.Game;
-            Entity? pump = FindPumpEntity(gc);
+            Entity? pump = FindPumpEntity(ctx);
 
             // The ONLY way to advance: positive confirmation that pump StateMachine
             // has "activated > 0". Don't trust IsEncounterActive (non-targetable fallback
@@ -943,7 +943,7 @@ namespace AutoExile.Modes
                 _sweepCombatEngageCount = 0;
 
                 // Find the closest alive monster to chase.
-                var nearestToPumpPos = FindSweepTargetMonster(gc, playerPos, ctx.Combat.BlacklistedEnemies);
+                var nearestToPumpPos = FindSweepTargetMonster(ctx, playerPos, ctx.Combat.BlacklistedEnemies);
                 if (nearestToPumpPos.HasValue)
                 {
                     var monsterDist = Vector2.Distance(playerPos, nearestToPumpPos.Value);
@@ -1032,14 +1032,14 @@ namespace AutoExile.Modes
         /// Find the alive hostile monster closest to the player so we clear smoothly as we go.
         /// Uses OnlyValidEntities (entity list), not blight-specific cache.
         /// </summary>
-        private static Vector2? FindSweepTargetMonster(GameController gc, Vector2 playerPos, HashSet<string> enemyBlacklist)
+        private static Vector2? FindSweepTargetMonster(BotContext ctx, Vector2 playerPos, HashSet<string> enemyBlacklist)
         {
             float bestScore = float.MaxValue;
             Vector2? bestPos = null;
 
-            foreach (var entity in gc.EntityListWrapper.OnlyValidEntities)
+            foreach (var entity in ctx.Entities.Monsters)
             {
-                if (entity.Type != EntityType.Monster || !entity.IsHostile) continue;
+                if (!entity.IsHostile) continue;
                 if (!entity.IsAlive || !entity.IsTargetable) continue;
                 if (enemyBlacklist.Count > 0 && !string.IsNullOrEmpty(entity.RenderName) &&
                     enemyBlacklist.Contains(entity.RenderName)) continue;
@@ -1137,9 +1137,9 @@ namespace AutoExile.Modes
             Entity? nearestChest = null;
             float nearestDist = float.MaxValue;
 
-            foreach (var entity in gc.EntityListWrapper.OnlyValidEntities)
+            foreach (var entity in ctx.Entities.Chests)
             {
-                if (entity.Type != EntityType.Chest || entity.IsOpened) continue;
+                if (entity.IsOpened) continue;
                 var dist = Vector2.Distance(playerPos, entity.GridPosNum);
                 if (dist < nearestDist)
                 {
@@ -1577,12 +1577,12 @@ namespace AutoExile.Modes
         // Helpers
         // =================================================================
 
-        private Entity? FindPumpEntity(GameController gc)
+        private Entity? FindPumpEntity(BotContext ctx)
         {
-            foreach (var entity in gc.EntityListWrapper.OnlyValidEntities)
+            foreach (var entity in ctx.Entities.IngameIcons)
             {
-                if (entity.Type == EntityType.IngameIcon &&
-                    entity.Path != null &&
+                if (entity.Type != EntityType.IngameIcon) continue;
+                if (entity.Path != null &&
                     entity.Path.EndsWith("/BlightPump"))
                     return entity;
             }

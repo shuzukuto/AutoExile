@@ -1222,9 +1222,8 @@ namespace AutoExile
         {
             if (!_exploration.IsInitialized) return;
 
-            foreach (var entity in GameController.EntityListWrapper.OnlyValidEntities)
+            foreach (var entity in _entityCache.AreaTransitions)
             {
-                if (entity.Type != ExileCore.Shared.Enums.EntityType.AreaTransition) continue;
                 var gridPos = new Vector2(entity.GridPosNum.X, entity.GridPosNum.Y);
                 _exploration.RecordTransition(gridPos, entity.RenderName ?? entity.Path ?? "");
             }
@@ -1862,9 +1861,8 @@ namespace AutoExile
 
             // Snapshot all buff names on nearby alive hostile monsters
             _buffScanBaseline.Clear();
-            foreach (var entity in gc.EntityListWrapper.OnlyValidEntities)
+            foreach (var entity in _entityCache.Monsters)
             {
-                if (entity.Type != ExileCore.Shared.Enums.EntityType.Monster) continue;
                 if (!entity.IsHostile || !entity.IsAlive) continue;
                 if (Vector2.Distance(entity.GridPosNum, gc.Player.GridPosNum) > 80) continue;
 
@@ -1912,9 +1910,8 @@ namespace AutoExile
 
             // Continuously scan for new buff names not in baseline
             var newBuffs = new HashSet<string>();
-            foreach (var entity in gc.EntityListWrapper.OnlyValidEntities)
+            foreach (var entity in _entityCache.Monsters)
             {
-                if (entity.Type != ExileCore.Shared.Enums.EntityType.Monster) continue;
                 if (!entity.IsHostile || !entity.IsAlive) continue;
                 if (Vector2.Distance(entity.GridPosNum, gc.Player.GridPosNum) > 80) continue;
 
