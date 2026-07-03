@@ -797,6 +797,17 @@ namespace AutoExile.Systems
         {
             if (!IsMovementActive) return;
 
+            // Snap cursor to player position (screen center) while key is still held.
+            // The game processes this on the next tick: "walk to here" = stop in place.
+            // Then we release the key, and the character has minimal residual movement.
+            if (WindowRect.Width > 10 && WindowRect.Height > 10)
+            {
+                var playerScreenPos = new Vector2(
+                    WindowRect.X + WindowRect.Width / 2f,
+                    WindowRect.Y + WindowRect.Height / 2f);
+                Input.SetCursorPos(playerScreenPos);
+            }
+
             SendKeyUp(_movementKey, "stop");
             IsMovementActive = false;
             IsMovementSuspended = false;
