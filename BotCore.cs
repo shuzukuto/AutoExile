@@ -123,7 +123,9 @@ namespace AutoExile
         private string _buffScanStatus = "";
         private DateTime _buffScanStartTime;
         private bool _buffScanWaitingForCast;
-        private const float BuffScanTimeoutSeconds = 8f;
+        private readonly Stopwatch _runtimeTimer = new();
+
+        public int SessionDeathCount { get; private set; }
 
         public override bool Initialise()
         {
@@ -837,6 +839,11 @@ namespace AutoExile
             var posText = $"Pos: {playerGrid.X:F1}, {playerGrid.Y:F1}  |  Dest: {destStr}";
             var posY = 116 + (_humanRecorder.IsRecording ? 20 : 0);
             Graphics.DrawText(posText, new Vector2(100, posY), SharpDX.Color.Cyan);
+            
+            var blightFails = _blightMode?.State?.SessionFails ?? 0;
+            var statsText = $"Blight Fail: {blightFails}  |  Dead Count: {SessionDeathCount}";
+            posY += 20;
+            Graphics.DrawText(statsText, new Vector2(100, posY), SharpDX.Color.Red);
 
             // Loot tracker overlay (top-right area)
             var winWidth = GameController.Window.GetWindowRectangle().Width;
@@ -1692,7 +1699,10 @@ namespace AutoExile
                 if (!_wasDead && _bossMode != null)
                     _bossMode.IncrementDeathCount();
                 if (!_wasDead)
+                {
                     _deathTime = DateTime.Now;
+                    SessionDeathCount++;
+                }
                 _wasDead = true;
 
                 // Click resurrect button (brief delay after death to avoid instant clicks)

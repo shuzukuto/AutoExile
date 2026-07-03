@@ -82,6 +82,7 @@ namespace AutoExile.Systems
         // Map completion tracking
         public bool MapComplete { get; set; }
         public int DeathCount { get; set; }
+        public int SessionFails { get; set; }
 
         // Debug diagnostics
         public string FoundationDebug { get; private set; } = "";
@@ -387,10 +388,15 @@ namespace AutoExile.Systems
                     var fail = GetStateValue(states, "fail");
                     if (encounterDone > 0 || success > 0 || fail > 0)
                     {
-                        IsEncounterDone = true;
-                        IsTimerDone = true;
-                        EncounterSucceeded = success > 0;
-                        TimerDoneAt ??= DateTime.Now;
+                        if (!IsEncounterDone)
+                        {
+                            IsEncounterDone = true;
+                            IsTimerDone = true;
+                            EncounterSucceeded = success > 0;
+                            if (!EncounterSucceeded)
+                                SessionFails++;
+                            TimerDoneAt ??= DateTime.Now;
+                        }
                     }
                 }
 
@@ -645,10 +651,15 @@ namespace AutoExile.Systems
 
                 if (encounterDone > 0 || success > 0 || fail > 0)
                 {
-                    IsEncounterDone = true;
-                    IsTimerDone = true;
-                    EncounterSucceeded = success > 0;
-                    TimerDoneAt ??= DateTime.Now;
+                    if (!IsEncounterDone)
+                    {
+                        IsEncounterDone = true;
+                        IsTimerDone = true;
+                        EncounterSucceeded = success > 0;
+                        if (!EncounterSucceeded)
+                            SessionFails++;
+                        TimerDoneAt ??= DateTime.Now;
+                    }
                 }
             }
         }
