@@ -124,6 +124,7 @@ namespace AutoExile
         private string _buffScanStatus = "";
         private DateTime _buffScanStartTime;
         private bool _buffScanWaitingForCast;
+        private const float BuffScanTimeoutSeconds = 8f;
         private readonly Stopwatch _runtimeTimer = new();
 
         public int SessionDeathCount { get; private set; }
