@@ -637,7 +637,29 @@ namespace AutoExile.Modes
                 return;
             }
 
+            // Strict constraint: never leave 20f radius of the pump during active encounter
+            if (EnforceStrictDefenseRadius(ctx))
+                return;
+
             TickTowerLoop(ctx);
+        }
+
+        private bool EnforceStrictDefenseRadius(BotContext ctx)
+        {
+            if (_blight.DefensePosition.HasValue)
+            {
+                var playerPos = ctx.Game.Player.GridPosNum;
+                var defensePos = _blight.DefensePosition.Value;
+                if (Vector2.Distance(playerPos, defensePos) > 20f)
+                {
+                    CancelTowerAction(ctx);
+                    if (!ctx.Navigation.IsNavigating)
+                        ctx.Navigation.NavigateTo(ctx.Game, defensePos);
+                    StatusText = "Returning to defense point (enforcing 20f radius)";
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void TickWaitForCompletion(BotContext ctx)
@@ -662,20 +684,9 @@ namespace AutoExile.Modes
                 return;
             }
 
-            // Strict positioning constraint: player must stay within 20f of the defense point during wait
-            if (_blight.DefensePosition.HasValue)
-            {
-                var playerPos = ctx.Game.Player.GridPosNum;
-                var defensePos = _blight.DefensePosition.Value;
-                if (Vector2.Distance(playerPos, defensePos) > 20f)
-                {
-                    CancelTowerAction(ctx);
-                    if (!ctx.Navigation.IsNavigating)
-                        ctx.Navigation.NavigateTo(ctx.Game, defensePos);
-                    StatusText = "Returning to defense point (enforcing 20f radius)";
-                    return;
-                }
-            }
+            // Strict constraint: never leave 20f radius of the pump while waiting
+            if (EnforceStrictDefenseRadius(ctx))
+                return;
 
             // Timer is done — prioritize combat over tower actions.
             // If nearby monsters exist, cancel tower actions and let combat positioning
