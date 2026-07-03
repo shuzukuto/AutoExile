@@ -109,6 +109,22 @@ namespace AutoExile.Systems
         // Chest ID→position mapping (needed for removal by event)
         private readonly Dictionary<long, Vector2> _chestEntityPositions = new();
 
+        private readonly Dictionary<long, DateTime> _towerBlacklist = new();
+
+        public void BlacklistTower(long entityId, float durationSeconds = 5f)
+        {
+            _towerBlacklist[entityId] = DateTime.Now.AddSeconds(durationSeconds);
+        }
+
+        public bool IsTowerBlacklisted(long entityId)
+        {
+            if (_towerBlacklist.TryGetValue(entityId, out var expiry))
+            {
+                if (DateTime.Now < expiry) return true;
+                _towerBlacklist.Remove(entityId);
+            }
+            return false;
+        }
 
         /// <summary>
         /// Reset all state for a new area/encounter.
@@ -133,6 +149,7 @@ namespace AutoExile.Systems
             KnownTowerEntityIds.Clear();
             FullyUpgradedTowerIds.Clear();
             _chestEntityPositions.Clear();
+            _towerBlacklist.Clear();
             LaneTracker = new BlightLaneTracker();
             LaneDebug = "";
             PumpUnderAttack = false;

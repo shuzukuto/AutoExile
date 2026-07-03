@@ -725,6 +725,10 @@ namespace AutoExile.Systems
         {
             CurrentPhase = Phase.Failed;
             Status = reason;
+            if (_targetEntityId != 0)
+            {
+                _blight.BlacklistTower(_targetEntityId, 5f);
+            }
         }
     }
 }
