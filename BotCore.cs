@@ -12,6 +12,7 @@ using AutoExile.Systems;
 using AutoExile.WebServer;
 using System.IO;
 using System.Linq;
+using System.Diagnostics;
 using System.Numerics;
 
 namespace AutoExile
