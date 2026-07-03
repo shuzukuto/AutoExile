@@ -1060,8 +1060,9 @@ namespace AutoExile.Modes
         // =================================================================
 
         private DateTime _lastEmptyScanAt = DateTime.MinValue;
+        private DateTime _chestOpenedAt = DateTime.MinValue;
         private const float LootTimeoutSeconds = 120f;
-        private const float EmptyGraceSeconds = 5f;
+        private const float EmptyGraceSeconds = 10f;
 
         private void EnterOpenChestsPhase()
         {
@@ -1088,7 +1089,13 @@ namespace AutoExile.Modes
             _lootTracker.HandleResult(interactionResult, ctx);
 
             if (interactionResult == InteractionResult.Succeeded || interactionResult == InteractionResult.Failed)
+            {
+                if (_currentChestTarget.HasValue && interactionResult == InteractionResult.Succeeded)
+                {
+                    _chestOpenedAt = DateTime.Now;
+                }
                 _currentChestTarget = null;
+            }
 
             if ((DateTime.Now - _phaseStartTime).TotalSeconds > LootTimeoutSeconds)
             {
@@ -1108,11 +1115,20 @@ namespace AutoExile.Modes
             if (best != null)
             {
                 _lastEmptyScanAt = DateTime.MinValue;
+                _chestOpenedAt = DateTime.MinValue; // cancel chest delay if we found loot
                 var withinRadius = best.Distance <= ctx.Interaction.InteractRadius;
                 ctx.Interaction.PickupGroundItem(best.Entity, ctx.Navigation,
                     requireProximity: !withinRadius);
                 _lootTracker.SetPending(best.Entity.Id, best.ItemName, best.ChaosValue);
                 StatusText = $"Picking up loot ({ctx.Loot.Candidates.Count} visible, {_lootTracker.PickupCount} picked, {_blight.ChestPositions.Count} chests left)";
+                return;
+            }
+
+            // Wait for chest loot to drop before moving on
+            if ((DateTime.Now - _chestOpenedAt).TotalSeconds < 2.5f)
+            {
+                ctx.Navigation.Stop(gc);
+                StatusText = "Waiting for chest loot to drop...";
                 return;
             }
 
