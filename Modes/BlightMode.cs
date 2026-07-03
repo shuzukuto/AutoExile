@@ -662,6 +662,21 @@ namespace AutoExile.Modes
                 return;
             }
 
+            // Strict positioning constraint: player must stay within 20f of the defense point during wait
+            if (_blight.DefensePosition.HasValue)
+            {
+                var playerPos = ctx.Game.Player.GridPosNum;
+                var defensePos = _blight.DefensePosition.Value;
+                if (Vector2.Distance(playerPos, defensePos) > 20f)
+                {
+                    CancelTowerAction(ctx);
+                    if (!ctx.Navigation.IsNavigating)
+                        ctx.Navigation.NavigateTo(ctx.Game, defensePos);
+                    StatusText = "Returning to defense point (enforcing 20f radius)";
+                    return;
+                }
+            }
+
             // Timer is done — prioritize combat over tower actions.
             // If nearby monsters exist, cancel tower actions and let combat positioning
             // take over (Combat.Tick runs before this, but tower navigation overrides
