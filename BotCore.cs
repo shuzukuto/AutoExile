@@ -552,7 +552,7 @@ namespace AutoExile
             _navigation.DashMinDistance = Settings.Build.DashMinDistance.Value;
             _navigation.PathMergeThreshold = Settings.Build.PathMergeThreshold.Value;
             BotInput.ActionCooldownMs = Settings.ActionCooldownMs.Value;
-            BotInput.WindowRect = GameController.Window.GetWindowRectangleTimeCache;
+            BotInput.WindowRect = GameController.Window.GetWindowRectangle();
             BotInput.TickHeldKeys(); // Safety watchdog — auto-release stale held keys
             BotInput.TickMovementLayer(); // Auto-resume movement after discrete actions
 
