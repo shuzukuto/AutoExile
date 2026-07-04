@@ -74,6 +74,9 @@ namespace AutoExile.Systems
         // Blight currency (read from UI each tick)
         public int Currency { get; private set; }
 
+        // Reported Chest Count from end-of-encounter UI
+        public int? ReportedChestCount { get; private set; }
+
         // Portal tracking — cache position when first seen in map for exit navigation
         public Vector2? PortalPosition { get; set; }
         public Vector3? PortalWorldPos { get; set; }
@@ -143,6 +146,7 @@ namespace AutoExile.Systems
             EncounterStartedAt = null;
             HasClickedFastForward = false;
             CountdownText = "";
+            ReportedChestCount = null;
             ChestPositions.Clear();
             CachedTowers.Clear();
             CachedFoundations.Clear();
@@ -435,6 +439,7 @@ namespace AutoExile.Systems
             TrackEncounterCompletion(gc);
             TrackDanger(gc);
             TrackCurrency(gc);
+            TrackBlightSummaryUI(gc);
             UpdateFoundationDebugText();
         }
 
@@ -747,6 +752,63 @@ namespace AutoExile.Systems
             }
             catch { }
         }
+
+        private void TrackBlightSummaryUI(GameController gc)
+        {
+            // Only search for summary UI when the encounter is considered done
+            if (!IsEncounterDone) return;
+
+            var ui = gc.IngameState.IngameUi;
+            if (ui == null) return;
+
+            try
+            {
+                // Top level search
+                for (int i = 0; i < ui.ChildCount && i < 50; i++)
+                {
+                    var top = ui.GetChildAtIndex(i);
+                    if (top == null || !top.IsVisible || top.ChildCount < 1) continue;
+
+                    int chests = SearchForChestCount(top, 0);
+                    if (chests >= 0)
+                    {
+                        ReportedChestCount = chests;
+
+                        // If game explicitly says 0 chests, clear any phantom coordinates
+                        // to prevent bot from endlessly searching for ghosts.
+                        if (chests == 0 && ChestPositions.Count > 0)
+                        {
+                            ChestPositions.Clear();
+                        }
+                        return;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private int SearchForChestCount(ExileCore.PoEMemory.Element node, int depth)
+        {
+            // Limit depth to avoid massive UI tree traversal lag
+            if (depth > 6 || node == null || !node.IsVisible) return -1;
+
+            if (!string.IsNullOrEmpty(node.Text) && node.Text.StartsWith("Chests:"))
+            {
+                var parts = node.Text.Split(':');
+                if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int count))
+                {
+                    return count;
+                }
+            }
+
+            for (int i = 0; i < node.ChildCount; i++)
+            {
+                var result = SearchForChestCount(node.GetChildAtIndex(i), depth + 1);
+                if (result >= 0) return result;
+            }
+            return -1;
+        }
+
 
         private static bool TryParseCurrency(string? text, out int value)
         {

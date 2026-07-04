@@ -1253,53 +1253,55 @@ namespace AutoExile.Modes
             }
 
             // Priority 4: Navigate to unvisited lane ends to discover off-screen chests
-            
-            // 4a. Update unvisited lane ends with newly discovered pathway ends
-            foreach (var lane in _blight.LaneTracker.Lanes)
+            if (_blight.ReportedChestCount != 0)
             {
-                if (lane.Count > 0)
+                // 4a. Update unvisited lane ends with newly discovered pathway ends
+                foreach (var lane in _blight.LaneTracker.Lanes)
                 {
-                    var endPos = lane[lane.Count - 1];
-                    // If this endPos is not near any visited area, and not already in unvisited, add it
-                    if (!_visitedLaneAreas.Any(v => Vector2.Distance(v, endPos) < 60f) &&
-                        !_unvisitedLaneEnds.Any(u => Vector2.Distance(u, endPos) < 20f))
+                    if (lane.Count > 0)
                     {
-                        _unvisitedLaneEnds.Add(endPos);
+                        var endPos = lane[lane.Count - 1];
+                        // If this endPos is not near any visited area, and not already in unvisited, add it
+                        if (!_visitedLaneAreas.Any(v => Vector2.Distance(v, endPos) < 60f) &&
+                            !_unvisitedLaneEnds.Any(u => Vector2.Distance(u, endPos) < 20f))
+                        {
+                            _unvisitedLaneEnds.Add(endPos);
+                        }
                     }
-                }
-            }
-
-            if (_unvisitedLaneEnds.Count > 0)
-            {
-                // 4b. Remove areas we are currently standing in, and mark them as visited
-                var reached = _unvisitedLaneEnds.Where(pos => Vector2.Distance(playerPos, pos) < 50f).ToList();
-                foreach (var r in reached)
-                {
-                    _unvisitedLaneEnds.Remove(r);
-                    _visitedLaneAreas.Add(r);
                 }
 
                 if (_unvisitedLaneEnds.Count > 0)
                 {
-                    Vector2? nearestLaneEnd = null;
-                    float bestDist = float.MaxValue;
-                    foreach (var pos in _unvisitedLaneEnds)
+                    // 4b. Remove areas we are currently standing in, and mark them as visited
+                    var reached = _unvisitedLaneEnds.Where(pos => Vector2.Distance(playerPos, pos) < 50f).ToList();
+                    foreach (var r in reached)
                     {
-                        var d = Vector2.Distance(playerPos, pos);
-                        if (d < bestDist) { bestDist = d; nearestLaneEnd = pos; }
+                        _unvisitedLaneEnds.Remove(r);
+                        _visitedLaneAreas.Add(r);
                     }
 
-                    if (nearestLaneEnd.HasValue)
+                    if (_unvisitedLaneEnds.Count > 0)
                     {
-                        if (!ctx.Navigation.IsNavigating)
+                        Vector2? nearestLaneEnd = null;
+                        float bestDist = float.MaxValue;
+                        foreach (var pos in _unvisitedLaneEnds)
                         {
-                            _lastEmptyScanAt = DateTime.MinValue; // Keep grace period reset
-                            var pathFound = ctx.Navigation.NavigateTo(gc, nearestLaneEnd.Value);
-                            if (!pathFound)
-                                _unvisitedLaneEnds.Remove(nearestLaneEnd.Value); // Unreachable
+                            var d = Vector2.Distance(playerPos, pos);
+                            if (d < bestDist) { bestDist = d; nearestLaneEnd = pos; }
                         }
-                        StatusText = $"Walking to lane ends to discover chests ({_unvisitedLaneEnds.Count} remaining)";
-                        return;
+
+                        if (nearestLaneEnd.HasValue)
+                        {
+                            if (!ctx.Navigation.IsNavigating)
+                            {
+                                _lastEmptyScanAt = DateTime.MinValue; // Keep grace period reset
+                                var pathFound = ctx.Navigation.NavigateTo(gc, nearestLaneEnd.Value);
+                                if (!pathFound)
+                                    _unvisitedLaneEnds.Remove(nearestLaneEnd.Value); // Unreachable
+                            }
+                            StatusText = $"Walking to lane ends to discover chests ({_unvisitedLaneEnds.Count} remaining)";
+                            return;
+                        }
                     }
                 }
             }
