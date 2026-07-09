@@ -162,8 +162,16 @@ namespace AutoExile.Modes
                     ctx.Combat.Profile.DefenseAnchor = null;
                     ctx.Combat.Profile.LeashAnchor = null;
                 }
+                bool skipCombat = false;
+                if (inEncounterPhase && _phase != BlightPhase.Sweep)
+                {
+                    skipCombat = EnforceStrictDefenseRadius(ctx);
+                }
 
-                ctx.Combat.Tick(ctx);
+                if (!skipCombat)
+                {
+                    ctx.Combat.Tick(ctx);
+                }
             }
 
             // Tick interaction system
@@ -652,8 +660,6 @@ namespace AutoExile.Modes
             TickTowerLoop(ctx);
         }
 
-        private DateTime _lastDefenseNavTime = DateTime.MinValue;
-
         private bool EnforceStrictDefenseRadius(BotContext ctx)
         {
             if (_blight.DefensePosition.HasValue)
@@ -665,12 +671,8 @@ namespace AutoExile.Modes
                     CancelTowerAction(ctx);
                     
                     // Force navigation back to defense point, ignoring current path/combat targets.
-                    // Throttle navigation calls to avoid spamming clicks every frame.
-                    if ((DateTime.Now - _lastDefenseNavTime).TotalSeconds > 1.0)
-                    {
-                        ctx.Navigation.NavigateTo(ctx.Game, defensePos);
-                        _lastDefenseNavTime = DateTime.Now;
-                    }
+                    // Call every frame — NavigationSystem.NavigateTo handles its own deduplication.
+                    ctx.Navigation.NavigateTo(ctx.Game, defensePos);
                     StatusText = "Returning to defense point (enforcing 10f radius)";
                     return true;
                 }
