@@ -147,7 +147,15 @@ namespace AutoExile.Modes
                 {
                     ctx.Combat.Profile.DefenseAnchor = _blight.DefensePosition.Value;
                     ctx.Combat.Profile.LeashAnchor = _blight.DefensePosition.Value;
-                    ctx.Combat.Profile.LeashRadius = Systems.Pathfinding.NetworkBubbleRadius;
+                    
+                    if (_phase is BlightPhase.TowerManagement or BlightPhase.WaitForCompletion)
+                    {
+                        ctx.Combat.Profile.LeashRadius = 10f;
+                    }
+                    else
+                    {
+                        ctx.Combat.Profile.LeashRadius = Systems.Pathfinding.NetworkBubbleRadius;
+                    }
                 }
                 else
                 {
@@ -644,18 +652,26 @@ namespace AutoExile.Modes
             TickTowerLoop(ctx);
         }
 
+        private DateTime _lastDefenseNavTime = DateTime.MinValue;
+
         private bool EnforceStrictDefenseRadius(BotContext ctx)
         {
             if (_blight.DefensePosition.HasValue)
             {
                 var playerPos = ctx.Game.Player.GridPosNum;
                 var defensePos = _blight.DefensePosition.Value;
-                if (Vector2.Distance(playerPos, defensePos) > 20f)
+                if (Vector2.Distance(playerPos, defensePos) > 10f)
                 {
                     CancelTowerAction(ctx);
-                    if (!ctx.Navigation.IsNavigating)
+                    
+                    // Force navigation back to defense point, ignoring current path/combat targets.
+                    // Throttle navigation calls to avoid spamming clicks every frame.
+                    if ((DateTime.Now - _lastDefenseNavTime).TotalSeconds > 1.0)
+                    {
                         ctx.Navigation.NavigateTo(ctx.Game, defensePos);
-                    StatusText = "Returning to defense point (enforcing 20f radius)";
+                        _lastDefenseNavTime = DateTime.Now;
+                    }
+                    StatusText = "Returning to defense point (enforcing 10f radius)";
                     return true;
                 }
             }
