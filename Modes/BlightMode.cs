@@ -1103,7 +1103,7 @@ namespace AutoExile.Modes
 
         private DateTime _lastEmptyScanAt = DateTime.MinValue;
         private DateTime _chestOpenedAt = DateTime.MinValue;
-        private const float LootTimeoutSeconds = 120f;
+        private const float LootTimeoutSeconds = 300f; // Increased from 120f to allow full clearing
         private const float EmptyGraceSeconds = 10f;
 
         private void EnterOpenChestsPhase()

@@ -789,8 +789,8 @@ namespace AutoExile.Systems
 
         private int SearchForChestCount(ExileCore.PoEMemory.Element node, int depth)
         {
-            // Limit depth to avoid massive UI tree traversal lag
-            if (depth > 6 || node == null || !node.IsVisible) return -1;
+            // Limit depth to avoid massive UI tree traversal lag (increased to 20 to find deeply nested summary UI)
+            if (depth > 20 || node == null || !node.IsVisible) return -1;
 
             if (!string.IsNullOrEmpty(node.Text) && node.Text.StartsWith("Chests:"))
             {
