@@ -1090,8 +1090,8 @@ namespace AutoExile
             [Menu("Portal Key", "Hotkey to scroll a portal in-game (used to open a portal back to hideout). Match your in-game keybinding.")]
             public HotkeyNode PortalKey { get; set; } = new HotkeyNode(Keys.F);
 
-            [Menu("Max Runtime (minutes)", "Stop the bot after this many minutes of *active* runtime (paused time doesn't count). 0 = no limit. Default 300 = 5 hours.")]
-            public RangeNode<int> MaxRuntimeMinutes { get; set; } = new RangeNode<int>(300, 0, 1440);
+            [Menu("Max Runtime (minutes)", "Stop the bot after this many minutes of *active* runtime (paused time doesn't count). 0 = no limit. Default 0 = unlimited.")]
+            public RangeNode<int> MaxRuntimeMinutes { get; set; } = new RangeNode<int>(0, 0, 1440);
         }
 
         [Submenu(CollapsedByDefault = true)]

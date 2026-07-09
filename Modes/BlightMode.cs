@@ -1314,13 +1314,26 @@ namespace AutoExile.Modes
 
             if (emptySince >= EmptyGraceSeconds)
             {
+                // Wait! If the game UI explicitly says there are still chests left, DO NOT LEAVE!
+                // We must have missed them. Clear visited areas to force a complete re-exploration of all lanes.
+                if (_blight.ReportedChestCount.HasValue && _blight.ReportedChestCount.Value > 0)
+                {
+                    _lastEmptyScanAt = DateTime.MinValue; // reset grace period
+                    _visitedLaneAreas.Clear(); // force re-check
+                    StatusText = $"Missing {_blight.ReportedChestCount.Value} chests! Re-checking all lane ends.";
+                    return;
+                }
+
                 ctx.Navigation.Stop(gc);
                 EnterExitMapPhase(ctx);
                 StatusText = $"Looting complete — exiting map ({_lootTracker.PickupCount} items)";
                 return;
             }
 
-            StatusText = $"Searching for remaining loot... ({_lootTracker.PickupCount} picked)";
+            if (_blight.ReportedChestCount.HasValue && _blight.ReportedChestCount.Value > 0)
+                StatusText = $"Searching for {_blight.ReportedChestCount.Value} remaining chests...";
+            else
+                StatusText = $"Searching for remaining loot... ({_lootTracker.PickupCount} picked)";
         }
 
         // =================================================================
