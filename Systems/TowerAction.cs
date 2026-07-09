@@ -402,8 +402,11 @@ namespace AutoExile.Systems
             {
                 if (cf.IsBuilt) continue;
 
+                var maxReach = 10f + _config.TowerApproachDistance.Value;
+                float effectiveBuildRadius = Math.Min(buildRadius, maxReach);
+
                 // Must be within build radius of defense center (grid units)
-                if (centerPos != Vector2.Zero && Vector2.Distance(cf.Position, centerPos) > buildRadius)
+                if (centerPos != Vector2.Zero && Vector2.Distance(cf.Position, centerPos) > effectiveBuildRadius)
                     continue;
 
                 // Skip foundations where no tower type is viable (all filtered by spread/nearby rules)
@@ -504,11 +507,15 @@ namespace AutoExile.Systems
                 if (!_config.IgnoreCurrency.Value && _blight.Currency < GetCostForTier(ct.Tier))
                     continue;
 
+                float buildRadius = _config.TowerBuildRadius.Value;
+                var maxReach = 10f + _config.TowerApproachDistance.Value;
+                float effectiveBuildRadius = Math.Min(buildRadius, maxReach);
+
                 // Must be within build radius of defense center (grid units)
-                if (centerPos != Vector2.Zero && Vector2.Distance(ct.Position, centerPos) > _config.TowerBuildRadius.Value)
+                if (centerPos != Vector2.Zero && Vector2.Distance(ct.Position, centerPos) > effectiveBuildRadius)
                     continue;
 
-                // Score: higher danger lanes + lower tier = higher priority
+                // Priority based on type and proximity lanes + lower tier = higher priority
                 int closestLane = _blight.LaneTracker.FindClosestLane(ct.Position, out _);
                 float laneDanger = closestLane >= 0 && closestLane < _blight.LaneTracker.LaneDanger.Length
                     ? _blight.LaneTracker.LaneDanger[closestLane] : 0;
