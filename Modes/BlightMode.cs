@@ -670,9 +670,13 @@ namespace AutoExile.Modes
                 {
                     CancelTowerAction(ctx);
                     
-                    // Force navigation back to defense point, ignoring current path/combat targets.
-                    // Call every frame — NavigationSystem.NavigateTo handles its own deduplication.
-                    ctx.Navigation.NavigateTo(ctx.Game, defensePos);
+                    // Only release combat keys and set destination if we aren't already heading there.
+                    // This prevents releasing the move key that NavigationSystem is holding.
+                    if (!ctx.Navigation.IsNavigating || ctx.Navigation.Destination != defensePos)
+                    {
+                        Systems.BotInput.ReleaseAllKeys();
+                        ctx.Navigation.NavigateTo(ctx.Game, defensePos);
+                    }
                     StatusText = "Returning to defense point (enforcing 10f radius)";
                     return true;
                 }

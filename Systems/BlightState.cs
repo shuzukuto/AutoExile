@@ -191,9 +191,10 @@ namespace AutoExile.Systems
             if (entity.Type == EntityType.IngameIcon && entity.Path.EndsWith("/BlightPump"))
             {
                 var pos = entity.GridPosNum;
-                if (PumpPosition.HasValue && Vector2.Distance(pos, PumpPosition.Value) > PumpRejectDistance)
-                    return; // garbage position — reject
-                PumpPosition = pos;
+                if (!PumpPosition.HasValue)
+                {
+                    PumpPosition = pos;
+                }
                 PumpEntityId = entity.Id;
                 IsPumpInRange = true;
                 return;
@@ -496,7 +497,7 @@ namespace AutoExile.Systems
                 if (entity.Id == PumpEntityId)
                 {
                     var pos = entity.GridPosNum;
-                    if (!PumpPosition.HasValue || Vector2.Distance(pos, PumpPosition.Value) < PumpRejectDistance)
+                    if (!PumpPosition.HasValue)
                     {
                         PumpPosition = pos;
                         PumpWorldPos = new Vector3(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
