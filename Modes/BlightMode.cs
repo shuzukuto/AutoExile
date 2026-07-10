@@ -677,7 +677,8 @@ namespace AutoExile.Modes
                         Systems.BotInput.ReleaseAllKeys();
                         ctx.Navigation.NavigateTo(ctx.Game, defensePos);
                     }
-                    StatusText = "Returning to defense point (enforcing 10f radius)";
+                    var distStr = Vector2.Distance(playerPos, defensePos).ToString("F1");
+                    StatusText = $"Returning to defend (dist: {distStr} / 10.0)";
                     return true;
                 }
             }
@@ -699,8 +700,6 @@ namespace AutoExile.Modes
 
             if (elapsed > sweepDelay)
             {
-                // Always enter sweep after delay — monsters may exist beyond render range
-                // even if AliveMonsterCount == 0. Sweep patrols lanes to find them.
                 CancelTowerAction(ctx);
                 EnterSweepPhase();
                 return;
@@ -723,7 +722,15 @@ namespace AutoExile.Modes
             else
             {
                 TickTowerLoop(ctx);
-                StatusText = $"Waiting — " + StatusText;
+                if (_towerAction == null)
+                {
+                    var timeLeft = Math.Max(0, sweepDelay - elapsed);
+                    var distStr = "";
+                    if (_blight.DefensePosition.HasValue)
+                        distStr = $", dist: {Vector2.Distance(ctx.Game.Player.GridPosNum, _blight.DefensePosition.Value):F1}";
+                    
+                    StatusText = $"Delay to search monster: {timeLeft:F1}s left{distStr}";
+                }
             }
         }
 
@@ -849,7 +856,8 @@ namespace AutoExile.Modes
                 _towerAction.Cancel(ctx.Game);
                 _towerAction = null;
             }
-            ctx.Navigation.Stop(ctx.Game);
+            // Do NOT unconditionally call Stop() here, as it will break the leash navigation
+            // that is immediately set by EnforceStrictDefenseRadius every frame.
         }
 
         // =================================================================
