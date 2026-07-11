@@ -108,6 +108,7 @@ namespace AutoExile.Systems
         public void Cancel(GameController gc)
         {
             _nav.Stop(gc);
+            Systems.BotInput.ResumeMovement("TowerHover");
             Fail("Cancelled");
         }
 
@@ -366,8 +367,35 @@ namespace AutoExile.Systems
             }
 
             var btnRect = button.GetClientRect();
-            if (!BotInput.ClickLabel(gc, btnRect)) return false;
+            var absPos = new Vector2(winRect.X + btnRect.Center.X, winRect.Y + btnRect.Center.Y);
 
+            if (_hoverStart == DateTime.MinValue)
+            {
+                Systems.BotInput.SuspendMovement("TowerHover");
+                ExileCore.Input.SetCursorPos(absPos);
+                _hoverStart = DateTime.Now;
+                Status = "Hovering button, waiting for tooltip";
+                return false;
+            }
+
+            var tooltip = button.Tooltip;
+            var tooltipVisible = tooltip != null && tooltip.IsVisible;
+            var elapsed = (DateTime.Now - _hoverStart).TotalMilliseconds;
+
+            if (!tooltipVisible && elapsed < 500)
+            {
+                ExileCore.Input.SetCursorPos(absPos); // Keep cursor on button
+                Status = $"Waiting for tooltip... ({elapsed:F0}ms)";
+                return false;
+            }
+
+            if (!Systems.BotInput.ClickLabel(gc, btnRect))
+            {
+                Systems.BotInput.ResumeMovement("TowerHover");
+                return false;
+            }
+
+            Systems.BotInput.ResumeMovement("TowerHover");
             CurrentPhase = Phase.Done;
             if (_type == ActionType.Build)
             {
@@ -381,6 +409,8 @@ namespace AutoExile.Systems
             }
             return true;
         }
+
+        private DateTime _hoverStart = DateTime.MinValue;
 
         // --- Target finding (uses cached data — works for off-screen entities) ---
 
