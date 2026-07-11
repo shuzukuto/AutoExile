@@ -108,7 +108,7 @@ namespace AutoExile.Systems
         public void Cancel(GameController gc)
         {
             _nav.Stop(gc);
-            Systems.BotInput.ResumeMovement("TowerHover");
+            Systems.BotInput.ResumeMovement();
             Fail("Cancelled");
         }
 
@@ -371,7 +371,7 @@ namespace AutoExile.Systems
 
             if (_hoverStart == DateTime.MinValue)
             {
-                Systems.BotInput.SuspendMovement("TowerHover");
+                Systems.BotInput.SuspendMovement();
                 ExileCore.Input.SetCursorPos(absPos);
                 _hoverStart = DateTime.Now;
                 Status = "Hovering button, waiting for tooltip";
@@ -391,11 +391,11 @@ namespace AutoExile.Systems
 
             if (!Systems.BotInput.ClickLabel(gc, btnRect))
             {
-                Systems.BotInput.ResumeMovement("TowerHover");
+                Systems.BotInput.ResumeMovement();
                 return false;
             }
 
-            Systems.BotInput.ResumeMovement("TowerHover");
+            Systems.BotInput.ResumeMovement();
             CurrentPhase = Phase.Done;
             if (_type == ActionType.Build)
             {
