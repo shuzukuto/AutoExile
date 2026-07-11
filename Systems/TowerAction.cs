@@ -389,7 +389,7 @@ namespace AutoExile.Systems
                 return false;
             }
 
-            if (!Systems.BotInput.ClickLabel(gc, btnRect))
+            if (!Systems.BotInput.Click(absPos))
             {
                 Systems.BotInput.ResumeMovement();
                 return false;
