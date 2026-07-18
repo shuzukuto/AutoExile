@@ -45,6 +45,10 @@ namespace AutoExile.Systems
 
         public bool IsNavigating { get; private set; }
         public bool IsPaused { get; private set; }
+        public bool IsPathfinding { get; private set; }
+        private Task<List<NavWaypoint>> _pathfindingTask;
+        private Vector2? _pathfindingTarget;
+        
         public List<NavWaypoint> CurrentNavPath { get; private set; } = new(); // grid coordinates
         public int CurrentWaypointIndex { get; private set; }
         public Vector2? Destination { get; private set; } // grid coordinates
@@ -176,6 +180,9 @@ namespace AutoExile.Systems
         private int _lastRepathWaypointIndex;
         private const float PeriodicRepathIntervalSec = 3.0f; // repath if waypoint hasn't advanced in this long
 
+
+        private DateTime _recoveryPauseEndTime = DateTime.MinValue;
+
         // Blink tracking — geometry for wall-side detection (grid coordinates)
         private bool _blinkPending;           // true after blink fires, waiting to confirm crossing
         private Vector2 _blinkBoundary;       // walk waypoint before blink (origin side of gap)
@@ -192,6 +199,10 @@ namespace AutoExile.Systems
         public void Tick(GameController gc)
         {
             if (!IsNavigating || IsPaused || CurrentNavPath.Count == 0)
+                return;
+
+            // Pause tick logic to let character move after an escape probe or backtrack
+            if (DateTime.Now < _recoveryPauseEndTime)
                 return;
 
             // Clear dash state after animation time
@@ -744,73 +755,104 @@ namespace AutoExile.Systems
                 maxNodes = gridArea > 2_000_000 ? 500_000 : 200_000;
             }
 
+            if (IsPathfinding)
+            {
+                if (_pathfindingTarget.HasValue && Vector2.Distance(_pathfindingTarget.Value, gridTarget) < 10f)
+                    return true; // Still calculating for the same approximate target
+                return false; // Busy calculating a different target, callers should wait
+            }
+
+            _pathfindingTarget = gridTarget;
+            IsPathfinding = true;
+
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
             var relaxed = RelaxedPathing;
             var minWalkable = relaxed ? 1 : 4;
+            var blinkEnabled = BlinkEnabled;
+            var blinkRange = BlinkRange;
+            var blinkCostPenalty = BlinkCostPenalty;
+            var pathMergeThreshold = PathMergeThreshold;
+            
+            // Extract tgtGrid before task
+            var tgtGrid = gc.IngameState.Data.RawTerrainTargetingData;
 
-            List<NavWaypoint> rawPath;
-            if (BlinkEnabled && !relaxed)
+            _pathfindingTask = Task.Run(() =>
             {
-                var tgtGrid = gc.IngameState.Data.RawTerrainTargetingData;
-                rawPath = Pathfinding.FindPathWithBlinks(
-                    pfGrid, tgtGrid, playerGrid, gridTarget,
-                    BlinkRange, BlinkCostPenalty, maxNodes);
-
-                // Fallback: blink scanning is expensive on large grids and may exhaust
-                // the node budget. Retry without blinks.
-                if (rawPath.Count == 0)
+                List<NavWaypoint> rawPath;
+                if (blinkEnabled && !relaxed)
                 {
-                    var simplePath = Pathfinding.FindPath(pfGrid, playerGrid, gridTarget, maxNodes);
+                    rawPath = Pathfinding.FindPathWithBlinks(
+                        pfGrid, tgtGrid, playerGrid, gridTarget,
+                        blinkRange, blinkCostPenalty, maxNodes);
+
+                    if (rawPath.Count == 0)
+                    {
+                        var simplePath = Pathfinding.FindPath(pfGrid, playerGrid, gridTarget, maxNodes);
+                        rawPath = simplePath.Select(p => new NavWaypoint(p, WaypointAction.Walk)).ToList();
+                    }
+                }
+                else
+                {
+                    var simplePath = Pathfinding.FindPath(pfGrid, playerGrid, gridTarget, maxNodes,
+                        flatCost: relaxed);
                     rawPath = simplePath.Select(p => new NavWaypoint(p, WaypointAction.Walk)).ToList();
                 }
-            }
-            else
+                return rawPath;
+            });
+
+            // Fire and forget continuation to update the path once calculated
+            _pathfindingTask.ContinueWith(t =>
             {
-                var simplePath = Pathfinding.FindPath(pfGrid, playerGrid, gridTarget, maxNodes,
-                    flatCost: relaxed);
-                rawPath = simplePath.Select(p => new NavWaypoint(p, WaypointAction.Walk)).ToList();
-            }
+                IsPathfinding = false;
+                sw.Stop();
+                LastPathfindMs = sw.ElapsedMilliseconds;
 
-            sw.Stop();
-            LastPathfindMs = sw.ElapsedMilliseconds;
+                var rawPath = t.Result;
+                if (rawPath.Count == 0)
+                    return;
 
-            if (rawPath.Count == 0)
-                return false;
+                var newPath = Pathfinding.SmoothNavPath(pfGrid, rawPath, minWalkable);
+                if (pathMergeThreshold > 0)
+                    newPath = Pathfinding.MergeCloseWaypoints(pfGrid, newPath,
+                        pathMergeThreshold, minWalkable);
 
-            CurrentNavPath = Pathfinding.SmoothNavPath(pfGrid, rawPath, minWalkable);
-            if (PathMergeThreshold > 0)
-                CurrentNavPath = Pathfinding.MergeCloseWaypoints(pfGrid, CurrentNavPath,
-                    PathMergeThreshold, minWalkable);
-            CurrentWaypointIndex = 0;
+                // Trim path and update state in a synchronized block or just assign it 
+                // since this is a background thread and CurrentNavPath might be read by Render
+                // Assignment is atomic, but we need to do the forward-trim first
+                
+                int startIdx = 0;
+                for (int i = 0; i < newPath.Count - 1; i++)
+                {
+                    if (newPath[i + 1].Action == WaypointAction.Blink)
+                        break;
 
-            // Forward-trim: skip walk waypoints the player has already passed.
-            for (int i = 0; i < CurrentNavPath.Count - 1; i++)
-            {
-                if (CurrentNavPath[i + 1].Action == WaypointAction.Blink)
-                    break;
+                    var toNext = newPath[i + 1].Position - newPath[i].Position;
+                    var toPlayer = playerGrid - newPath[i].Position;
 
-                var toNext = CurrentNavPath[i + 1].Position - CurrentNavPath[i].Position;
-                var toPlayer = playerGrid - CurrentNavPath[i].Position;
+                    if (Vector2.Dot(toNext, toPlayer) > 0)
+                        startIdx = i + 1;
+                    else
+                        break;
+                }
 
-                if (Vector2.Dot(toNext, toPlayer) > 0)
-                    CurrentWaypointIndex = i + 1;
-                else
-                    break;
-            }
+                CurrentNavPath = newPath;
+                CurrentWaypointIndex = startIdx;
 
-            if (!Destination.HasValue || Vector2.Distance(Destination.Value, gridTarget) > 10f)
-                _totalStuckRecoveries = 0;
-            Destination = gridTarget;
-            IsNavigating = true;
-            BlinkCount = CurrentNavPath.Count(w => w.Action == WaypointAction.Blink);
-            _blinkPending = false;
-            _stuckTimer = 0;
-            _bestDistToWaypoint = float.MaxValue;
-            _noProgressTimer = 0;
-            _lastPosition = playerGrid;
-            _lastRepathTime = DateTime.Now;
-            _lastRepathWaypointIndex = CurrentWaypointIndex;
+                if (!Destination.HasValue || Vector2.Distance(Destination.Value, gridTarget) > 10f)
+                    _totalStuckRecoveries = 0;
+                
+                Destination = gridTarget;
+                IsNavigating = true;
+                BlinkCount = CurrentNavPath.Count(w => w.Action == WaypointAction.Blink);
+                _blinkPending = false;
+                _stuckTimer = 0;
+                _bestDistToWaypoint = float.MaxValue;
+                _noProgressTimer = 0;
+                _lastPosition = playerGrid;
+                _lastRepathTime = DateTime.Now;
+                _lastRepathWaypointIndex = CurrentWaypointIndex;
+            });
 
             return true;
         }
@@ -925,6 +967,7 @@ namespace AutoExile.Systems
             var screenPos = GridToScreen(gc, bestBacktrack.Value);
             var windowRect = gc.Window.GetWindowRectangle();
             ExecuteWalk(screenPos, windowRect, pushOut: false);
+            _recoveryPauseEndTime = DateTime.Now.AddMilliseconds(600);
             LastRecoveryAction = $"Backtrack ({Vector2.Distance(playerGrid, bestBacktrack.Value):F0}g, {currentDistToDest - bestDistToDest:F0}g closer)";
             return true;
         }
@@ -961,6 +1004,7 @@ namespace AutoExile.Systems
             var windowRect = gc.Window.GetWindowRectangle();
 
             ExecuteWalk(screenPos, windowRect, pushOut: false);
+            _recoveryPauseEndTime = DateTime.Now.AddMilliseconds(500);
             LastRecoveryAction = $"Escape probe ({probeDistance:F0}g, attempt #{_stuckAtSameSpotCount})";
         }
 

@@ -46,6 +46,7 @@ namespace AutoExile.Modes
         // Track whether we were searching (no monsters) last tick — reset exploration when
         // transitioning from searching → combat, so the next search re-sweeps the whole map
         private bool _wasSearching;
+        private Vector2? _navTarget;
 
         // Wave start retry tracking — bail if we can't start the next wave
         private int _waveStartAttempts;
@@ -61,6 +62,9 @@ namespace AutoExile.Modes
         // Monster blacklist — temporarily ignore monsters we can't kill so we reposition via explore
         private readonly Dictionary<long, DateTime> _blacklistedMonsters = new();
         private const float MonsterBlacklistSeconds = 10f;
+
+        // Incubator tracking cache
+        private int _cachedStashIncubators = 0;
 
 
         // Action cooldown
@@ -81,6 +85,7 @@ namespace AutoExile.Modes
             _lootTracker.Reset();
             _lastKnownWave = 0;
             _wasSearching = false;
+            _navTarget = null;
             _waveStartAttempts = 0;
             _betweenWaveStartTime = DateTime.MinValue;
 
@@ -229,7 +234,8 @@ namespace AutoExile.Modes
                 if (_mapCompleted)
                 {
                     // Map completed — start new cycle
-                    _state.RecordRunComplete();
+                    bool isSuccess = _state.HighestWaveThisRun >= 15;
+                    _state.RecordRunComplete(isSuccess);
                     _state.Reset();
                     _phase = SimPhase.InHideout;
                     _phaseStartTime = DateTime.Now;
@@ -249,7 +255,7 @@ namespace AutoExile.Modes
                 else if (_state.DeathCount >= ctx.Settings.Run.MaxDeaths.Value)
                 {
                     // Too many deaths — start fresh
-                    _state.RecordRunComplete();
+                    _state.RecordRunComplete(false);
                     _state.Reset();
                     _phase = SimPhase.InHideout;
                     _phaseStartTime = DateTime.Now;
@@ -655,12 +661,24 @@ namespace AutoExile.Modes
 
                 bool hasLoot = ctx.Loot.HasLootNearby;
                 bool pickingUp = ctx.Interaction.IsBusy && _lootTracker.HasPending;
-
-                if (hasLoot || pickingUp)
+                
+                // Ensure the bot is close enough to the monolith to actually see the loot drops.
+                // Simulacrum rewards drop at the center. If we're far away, pause the delay timer.
+                bool isNearMonolith = true;
+                if (_state.MonolithPosition.HasValue)
                 {
-                    if (hasLoot)
+                    var distToMonolith = Vector2.Distance(playerPos, _state.MonolithPosition.Value);
+                    if (distToMonolith > 80f)
                     {
-                        // Loot exists — reset wave delay (items may still be dropping)
+                        isNearMonolith = false;
+                    }
+                }
+
+                if (hasLoot || pickingUp || !isNearMonolith)
+                {
+                    if (hasLoot || !isNearMonolith)
+                    {
+                        // Reset wave delay if items are dropping, OR if we aren't in position to see them yet
                         _state.ResetWaveDelay(_settings.MinWaveDelaySeconds.Value);
                     }
 
@@ -678,9 +696,27 @@ namespace AutoExile.Modes
 
                     // Either picking up or waiting — stay near spawn zones, don't wander to monolith
                     if (!ctx.Interaction.IsBusy)
-                        IdleNearMonolith(ctx);
-                    Decision = pickingUp ? "Between waves — picking up loot" : "Between waves — clearing loot";
-                    StatusText = pickingUp ? $"Picking up loot (between waves)" : "Loot nearby — clearing before next wave";
+                    {
+                        if (isNearMonolith)
+                        {
+                            ctx.Navigation.Stop(gc);
+                        }
+                        else
+                        {
+                            IdleNearMonolith(ctx);
+                        }
+                    }
+                    
+                    if (!isNearMonolith && !hasLoot && !pickingUp)
+                    {
+                        Decision = "Between waves — moving to monolith";
+                        StatusText = "Returning to monolith for loot drops";
+                    }
+                    else
+                    {
+                        Decision = pickingUp ? "Between waves — picking up loot" : "Between waves — clearing loot";
+                        StatusText = pickingUp ? $"Picking up loot (between waves)" : "Loot nearby — clearing before next wave";
+                    }
                     return;
                 }
             }
@@ -764,6 +800,7 @@ namespace AutoExile.Modes
                 if (nearestPos.HasValue)
                 {
                     _wasSearching = true;
+                    _navTarget = null; // Chasing a monster, clear exploration target
                     var monsterDist = Vector2.Distance(playerPos, nearestPos.Value);
                     if (monsterDist > 20f)
                     {
@@ -782,10 +819,26 @@ namespace AutoExile.Modes
             // (ResetSeen already called at the fighting→searching transition above)
 
             // Let current navigation finish before picking a new target
-            if (ctx.Navigation.IsNavigating)
+            if (ctx.Navigation.IsPathfinding || ctx.Navigation.IsNavigating)
             {
+                if (ctx.Navigation.IsNavigating && !ctx.Navigation.IsPaused && ctx.Navigation.StuckRecoveries >= 3 && _navTarget.HasValue)
+                {
+                    ctx.Exploration.MarkRegionFailed(_navTarget.Value);
+                    ctx.Navigation.Stop(gc);
+                    _navTarget = null;
+                    Decision = "Abandoned stuck exploration target";
+                }
                 StatusText = $"Wave {_state.CurrentWave}/15 — searching for monsters";
                 return;
+            }
+
+            if (_navTarget.HasValue)
+            {
+                // We were not navigating and not pathfinding, but we had a target.
+                // This means pathfinding either finished and failed, or we arrived.
+                // Either way, mark it failed to ensure ExplorationMap skips it.
+                ctx.Exploration.MarkRegionFailed(_navTarget.Value);
+                _navTarget = null;
             }
 
             if (ctx.Exploration.IsInitialized)
@@ -793,8 +846,16 @@ namespace AutoExile.Modes
                 var target = ctx.Exploration.GetNextExplorationTarget(playerPos);
                 if (target.HasValue)
                 {
-                    ctx.Navigation.NavigateTo(gc, target.Value);
-                    StatusText = $"Wave {_state.CurrentWave}/15 — exploring for monsters";
+                    if (ctx.Navigation.NavigateTo(gc, target.Value))
+                    {
+                        _navTarget = target.Value;
+                        StatusText = $"Wave {_state.CurrentWave}/15 — exploring for monsters";
+                    }
+                    else
+                    {
+                        ctx.Exploration.MarkRegionFailed(target.Value);
+                        _navTarget = null;
+                    }
                     return;
                 }
             }
@@ -1344,6 +1405,59 @@ namespace AutoExile.Modes
                 new Vector2(hudX, hudY),
                 _state.IsWaveActive ? SharpDX.Color.Red : SharpDX.Color.Cyan);
             hudY += lineH;
+
+            // --- Incubator Stats ---
+            try
+            {
+                var invIncubators = 0;
+                var incubatedItems = 0;
+
+                var invItems = gc.IngameState.ServerData?.PlayerInventories?[0]?.Inventory?.InventorySlotItems;
+                if (invItems != null)
+                {
+                    foreach (var slot in invItems)
+                    {
+                        var item = slot.Item;
+                        if (item?.Path != null && item.Path.Contains("/CurrencyIncubation"))
+                            invIncubators++;
+                    }
+                }
+
+                var stashItems = gc.IngameState.IngameUi.StashElement?.VisibleStash?.VisibleInventoryItems;
+                if (stashItems != null)
+                {
+                    int currentStashIncubators = 0;
+                    foreach (var item in stashItems)
+                    {
+                        if (item?.Entity?.Path != null && item.Entity.Path.Contains("/CurrencyIncubation"))
+                            currentStashIncubators++;
+                    }
+                    _cachedStashIncubators = currentStashIncubators;
+                }
+
+                var inventories = gc.IngameState.ServerData?.PlayerInventories;
+                if (inventories != null)
+                {
+                    foreach (var invHolder in inventories)
+                    {
+                        var inv = invHolder.Inventory;
+                        if (inv == null || inv == gc.IngameState.ServerData?.PlayerInventories?[0]?.Inventory)
+                            continue;
+                        
+                        var equippedItem = inv.Items.FirstOrDefault();
+                        if (equippedItem?.TryGetComponent<ExileCore.PoEMemory.Components.Mods>(out var mods) == true)
+                        {
+                            if (!string.IsNullOrEmpty(mods.IncubatorName))
+                                incubatedItems++;
+                        }
+                    }
+                }
+
+                var incubText = $"Incubators: Inv({invIncubators}) / Stash({_cachedStashIncubators})  |  Incubated Items: {incubatedItems}";
+                g.DrawText(incubText, new Vector2(hudX, hudY), SharpDX.Color.LimeGreen);
+                hudY += lineH;
+            }
+            catch { }
 
             if (_state.DeathCount > 0)
             {

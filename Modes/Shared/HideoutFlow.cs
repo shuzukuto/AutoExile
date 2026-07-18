@@ -177,13 +177,9 @@ namespace AutoExile.Modes.Shared
             bool needMultiWithdraw = activeWithdrawList != null;
             bool needWithdraw = needSingleWithdraw || needMultiWithdraw;
 
-            // Not enough fragments and no way to get more — signal stop (only for modes that use fragments)
-            if (usesFragments && fragmentsInInventory < minNeeded && !canWithdraw)
-            {
-                Status = "No fragments in inventory";
-                _phase = HideoutPhase.Idle;
-                return HideoutSignal.NoFragments;
-            }
+            // We intentionally do NOT abort early here just because the inventory is empty.
+            // The map/fragments might be residing in the Map Device Stash, which we can only check
+            // once we actually walk over and open the Map Device UI.
 
             // Stash loot only if non-fragment items exceed threshold
             bool needStore = false;
@@ -284,6 +280,10 @@ namespace AutoExile.Modes.Shared
                         StartMapDevice(ctx);
                     }
                     break;
+                case MapDeviceResult.OutOfMaps:
+                    Status = "No fragments/maps in Map Device Stash or inventory";
+                    _phase = HideoutPhase.Idle;
+                    return HideoutSignal.NoFragments;
                 default:
                     Status = $"Map device: {ctx.MapDevice.Status}";
                     break;

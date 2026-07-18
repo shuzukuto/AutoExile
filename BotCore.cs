@@ -842,8 +842,19 @@ namespace AutoExile
             var posY = 116 + (_humanRecorder.IsRecording ? 20 : 0);
             Graphics.DrawText(posText, new Vector2(100, posY), SharpDX.Color.Cyan);
             
-            var blightFails = _blightMode?.State?.SessionFails ?? 0;
-            var statsText = $"Blight Fail: {blightFails}  |  Dead Count: {SessionDeathCount}";
+            string failText;
+            if (_mode == _simulacrumMode)
+            {
+                var simuFails = _simulacrumMode?.State?.SessionFails ?? 0;
+                failText = $"Simu Fail: {simuFails}";
+            }
+            else
+            {
+                var blightFails = _blightMode?.State?.SessionFails ?? 0;
+                failText = $"Blight Fail: {blightFails}";
+            }
+            
+            var statsText = $"{failText}  |  Dead Count: {SessionDeathCount}";
             posY += 20;
             Graphics.DrawText(statsText, new Vector2(100, posY), SharpDX.Color.Red);
 

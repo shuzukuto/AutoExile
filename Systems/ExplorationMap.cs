@@ -42,6 +42,7 @@ namespace AutoExile.Systems
         public float ActiveBlobCoverage => ActiveBlob?.Coverage ?? 0f;
         public int TotalBlobCount => Blobs.Count;
         public bool IsInitialized => Blobs.Count > 0;
+        public bool IsInitializing { get; private set; }
 
         // Known transition portals (grid positions where we've seen AreaTransition entities)
         public List<TransitionPortal> KnownTransitions { get; } = new();
@@ -97,6 +98,8 @@ namespace AutoExile.Systems
         /// </summary>
         public void Initialize(int[][] pfGrid, int[][]? tgtGrid, Vector2 playerGridPos, int blinkRange)
         {
+            if (IsInitializing) return;
+
             Clear();
 
             if (pfGrid == null || pfGrid.Length == 0) return;
@@ -109,36 +112,49 @@ namespace AutoExile.Systems
             px = Math.Clamp(px, 0, cols - 1);
             py = Math.Clamp(py, 0, rows - 1);
 
-            // If player is on unwalkable cell, find nearest walkable
-            if (pfGrid[py][px] == 0)
+            IsInitializing = true;
+            LastAction = "Initializing (async)...";
+
+            Task.Run(() =>
             {
-                var nearest = FindNearestWalkable(pfGrid, px, py, rows, cols);
-                if (nearest == null)
+                // If player is on unwalkable cell, find nearest walkable
+                if (pfGrid[py][px] == 0)
                 {
-                    LastAction = "No walkable cells found near player";
+                    var nearest = FindNearestWalkable(pfGrid, px, py, rows, cols);
+                    if (nearest == null)
+                    {
+                        LastAction = "No walkable cells found near player";
+                        IsInitializing = false;
+                        return;
+                    }
+                    (px, py) = nearest.Value;
+                }
+
+                // Flood fill from player position
+                var blobCells = FloodFill(pfGrid, tgtGrid, px, py, rows, cols, blinkRange);
+
+                if (blobCells.Count == 0)
+                {
+                    LastAction = "Flood fill returned 0 cells";
+                    IsInitializing = false;
                     return;
                 }
-                (px, py) = nearest.Value;
-            }
 
-            // Flood fill from player position
-            var blobCells = FloodFill(pfGrid, tgtGrid, px, py, rows, cols, blinkRange);
+                var blob = CreateBlob(blobCells, 0);
+                
+                lock (Blobs)
+                {
+                    Blobs.Add(blob);
+                    ActiveBlobIndex = 0;
+                    TotalWalkableCells = blobCells.Count;
+                }
 
-            if (blobCells.Count == 0)
-            {
-                LastAction = "Flood fill returned 0 cells";
-                return;
-            }
+                // Mark cells near player as already seen
+                Update(playerGridPos);
 
-            var blob = CreateBlob(blobCells, 0);
-            Blobs.Add(blob);
-            ActiveBlobIndex = 0;
-            TotalWalkableCells = blobCells.Count;
-
-            // Mark cells near player as already seen
-            Update(playerGridPos);
-
-            LastAction = $"Initialized: {blobCells.Count} cells, {blob.Regions.Count} regions";
+                LastAction = $"Initialized: {blobCells.Count} cells, {blob.Regions.Count} regions";
+                IsInitializing = false;
+            });
         }
 
         /// <summary>
@@ -147,20 +163,15 @@ namespace AutoExile.Systems
         public int EnterNewBlob(int[][] pfGrid, int[][]? tgtGrid, Vector2 playerGridPos, int blinkRange)
         {
             if (pfGrid == null || pfGrid.Length == 0) return -1;
+            if (IsInitializing) return Blobs.Count; // returning pending index
 
             var rows = pfGrid.Length;
             var cols = pfGrid[0].Length;
             var px = (int)playerGridPos.X;
             var py = (int)playerGridPos.Y;
+
             px = Math.Clamp(px, 0, cols - 1);
             py = Math.Clamp(py, 0, rows - 1);
-
-            if (pfGrid[py][px] == 0)
-            {
-                var nearest = FindNearestWalkable(pfGrid, px, py, rows, cols);
-                if (nearest == null) return -1;
-                (px, py) = nearest.Value;
-            }
 
             // Check if player is already inside an existing blob
             var playerCell = new Vector2i(px, py);
@@ -175,18 +186,49 @@ namespace AutoExile.Systems
                 }
             }
 
-            // New disconnected area — create new blob
-            var blobCells = FloodFill(pfGrid, tgtGrid, px, py, rows, cols, blinkRange);
-            if (blobCells.Count == 0) return -1;
+            IsInitializing = true;
+            LastAction = "Entering new blob (async)...";
 
-            var blob = CreateBlob(blobCells, Blobs.Count);
-            Blobs.Add(blob);
-            ActiveBlobIndex = Blobs.Count - 1;
-            TotalWalkableCells += blobCells.Count;
+            Task.Run(() =>
+            {
+                if (pfGrid[py][px] == 0)
+                {
+                    var nearest = FindNearestWalkable(pfGrid, px, py, rows, cols);
+                    if (nearest == null)
+                    {
+                        LastAction = "No walkable cells found near player (new blob)";
+                        IsInitializing = false;
+                        return;
+                    }
+                    (px, py) = nearest.Value;
+                }
 
-            Update(playerGridPos);
-            LastAction = $"New blob {ActiveBlobIndex}: {blobCells.Count} cells, {blob.Regions.Count} regions";
-            return ActiveBlobIndex;
+                var blobCells = FloodFill(pfGrid, tgtGrid, px, py, rows, cols, blinkRange);
+
+                if (blobCells.Count == 0)
+                {
+                    LastAction = "Flood fill returned 0 cells (new blob)";
+                    IsInitializing = false;
+                    return;
+                }
+
+                lock (Blobs)
+                {
+                    var newIdx = Blobs.Count;
+                    var blob = CreateBlob(blobCells, newIdx);
+                    Blobs.Add(blob);
+                    ActiveBlobIndex = newIdx;
+                    TotalWalkableCells += blobCells.Count;
+                    LastAction = $"Entered blob {newIdx}: {blobCells.Count} cells, {blob.Regions.Count} regions";
+                }
+                
+                // Update is safe enough to be called here or next tick
+                Update(playerGridPos);
+
+                IsInitializing = false;
+            });
+
+            return Blobs.Count;
         }
 
         /// <summary>

@@ -188,8 +188,8 @@ namespace AutoExile.Systems
         {
             if (!PumpPosition.HasValue || pathways.Count == 0)
             {
-                HubPosition = null;
-                HubWorldPos = null;
+                // Do not reset HubPosition to null if it was already found!
+                // Entities unload, but the hub location doesn't move.
                 return;
             }
 
@@ -198,9 +198,12 @@ namespace AutoExile.Systems
             // The blight organism (defense target) sits at the base of the lanes,
             // near but not exactly at the pump entity. Find the pathway position
             // closest to the pump — that's where monsters converge.
-            float bestDist = float.MaxValue;
-            Vector2? bestPos = null;
-            Vector3? bestWorldPos = null;
+            // We only update if we find a pathway CLOSER than our current known hub.
+            float bestDist = HubPosition.HasValue ? Vector2.Distance(HubPosition.Value, pump) : float.MaxValue;
+            Vector2? bestPos = HubPosition;
+            Vector3? bestWorldPos = HubWorldPos;
+            bool foundCloser = false;
+            
             foreach (var (_, pos, worldPos) in pathways)
             {
                 var dist = Vector2.Distance(pos, pump);
@@ -209,11 +212,15 @@ namespace AutoExile.Systems
                     bestDist = dist;
                     bestPos = pos;
                     bestWorldPos = worldPos;
+                    foundCloser = true;
                 }
             }
 
-            HubPosition = bestPos;
-            HubWorldPos = bestWorldPos;
+            if (foundCloser || !HubPosition.HasValue)
+            {
+                HubPosition = bestPos;
+                HubWorldPos = bestWorldPos;
+            }
         }
 
         /// <summary>

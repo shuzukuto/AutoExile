@@ -236,9 +236,6 @@ namespace AutoExile.Systems
                     Status = $"Waiting for label ({waited:F0}ms)";
                     return false;
                 }
-                // Fallback: try clicking via WorldToScreen position
-                if (TryClickWorldPosition(gc, targetEntity))
-                    return true;
 
                 var playerDist = Vector2.Distance(gc.Player.GridPosNum, _targetGridPos);
                 Fail($"Label not visible (id={_targetEntityId}, dist={playerDist:F0})");
@@ -382,11 +379,20 @@ namespace AutoExile.Systems
             var tooltipVisible = tooltip != null && tooltip.IsVisible;
             var elapsed = (DateTime.Now - _hoverStart).TotalMilliseconds;
 
-            if (!tooltipVisible && elapsed < 500)
+            if (!tooltipVisible)
             {
-                ExileCore.Input.SetCursorPos(absPos); // Keep cursor on button
-                Status = $"Waiting for tooltip... ({elapsed:F0}ms)";
-                return false;
+                if (elapsed < 500)
+                {
+                    ExileCore.Input.SetCursorPos(absPos); // Keep cursor on button
+                    Status = $"Waiting for tooltip... ({elapsed:F0}ms)";
+                    return false;
+                }
+                else
+                {
+                    Systems.BotInput.ResumeMovement();
+                    Fail($"Tooltip never appeared after {elapsed:F0}ms");
+                    return false;
+                }
             }
 
             if (!Systems.BotInput.Click(absPos))

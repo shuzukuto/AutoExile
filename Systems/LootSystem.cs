@@ -329,6 +329,14 @@ namespace AutoExile.Systems
             if (interaction.IsBusy)
                 return (false, null);
 
+            // Re-evaluate distances dynamically in case player moved since last Scan()
+            foreach (var c in _candidates)
+            {
+                if (c.Entity != null && c.Entity.IsValid)
+                    c.Distance = c.Entity.DistancePlayer;
+            }
+            _candidates.Sort((a, b) => a.Distance.CompareTo(b.Distance));
+
             // Find best candidate that isn't in the failed list (stale scan results
             // may still contain items that were picked up since the last Scan() call)
             LootCandidate? best = null;

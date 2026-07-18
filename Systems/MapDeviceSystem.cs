@@ -416,40 +416,17 @@ namespace AutoExile.Systems
                 }
             }
 
-            // Find a matching map from the stash and insert it
-            var mapStash = atlas.GetChildFromIndices(MapStashPath);
-            if (mapStash == null)
-            {
-                Status = "[Select] Map stash panel not found";
-                _phase = MapDevicePhase.Idle;
-                return MapDeviceResult.Failed;
-            }
-
             Element? targetMap = null;
             int checkedCount = 0;
-            for (int i = 0; i < mapStash.ChildCount; i++)
-            {
-                var item = mapStash.GetChildAtIndex(i);
-                if (item == null || item.Type != ElementType.InventoryItem)
-                    continue;
-                checkedCount++;
 
-                if (_mapFilter != null && !_mapFilter(item))
-                    continue;
-
-                targetMap = item;
-                break;
-            }
-
-            // Fallback: check player inventory for the map / fragment.
-            //
+            // 1. First: Check player inventory for the map / fragment.
             // Click type depends on flow:
             //   • Named-map flow (TargetMapName set, e.g. "City Square"): the atlas
             //     node is already selected, so a Ctrl+click on the inventory map
             //     drops it into the selected slot.
             //   • Auto-match flow (boss fragment with no TargetMapName): right-click
             //     auto-selects the correct atlas node AND inserts in one action.
-            if (targetMap == null && _inventoryFragmentPath != null)
+            if (_inventoryFragmentPath != null)
             {
                 if (!CanAct()) return MapDeviceResult.InProgress;
 
@@ -475,7 +452,6 @@ namespace AutoExile.Systems
                 }
 
                 // Inventory is open — find and click the matching item
-                bool foundAny = false;
                 var invItems = gc.IngameState.ServerData?.PlayerInventories?[0]?.Inventory?.InventorySlotItems;
                 if (invItems != null)
                 {
@@ -486,7 +462,6 @@ namespace AutoExile.Systems
                         if (!item.Path.Contains(_inventoryFragmentPath, StringComparison.OrdinalIgnoreCase))
                             continue;
 
-                        foundAny = true;
                         var windowRect2 = gc.Window.GetWindowRectangle();
                         var slotRect = slotItem.GetClientRect();
                         var absPos2 = new Vector2(windowRect2.X + slotRect.Center.X,
@@ -505,22 +480,40 @@ namespace AutoExile.Systems
                         return MapDeviceResult.InProgress;
                     }
                 }
-
-                if (!foundAny)
-                {
-                    Status = $"[Select] No '{_inventoryFragmentPath}' in stash or inventory";
-                    _phase = MapDevicePhase.Idle;
-                    return MapDeviceResult.Failed;
-                }
             }
 
-            if (targetMap == null)
+            // 2. Fallback: Find a matching map from the map device stash and insert it
+            var mapStash = atlas.GetChildFromIndices(MapStashPath);
+            if (mapStash == null)
             {
-                Status = $"[Select] No matching maps in stash ({checkedCount} items checked)";
+                Status = "[Select] Map stash panel not found";
                 _phase = MapDevicePhase.Idle;
                 return MapDeviceResult.Failed;
             }
 
+            for (int i = 0; i < mapStash.ChildCount; i++)
+            {
+                var item = mapStash.GetChildAtIndex(i);
+                if (item == null || item.Type != ElementType.InventoryItem)
+                    continue;
+                checkedCount++;
+
+                if (_mapFilter != null && !_mapFilter(item))
+                    continue;
+
+                targetMap = item;
+                break;
+            }
+
+            if (targetMap == null)
+            {
+                // Not found in inventory AND not found in stash
+                Status = $"[Select] No matching maps in stash or inventory ({checkedCount} items checked)";
+                _phase = MapDevicePhase.Idle;
+                return MapDeviceResult.OutOfMaps;
+            }
+
+            // 3. Map found in Map Device Stash: Click it to insert
             // Named map: Ctrl+click inserts into the already-selected node's device slot.
             // Auto-match: Right-click auto-selects the correct atlas node AND inserts.
             var rect = targetMap.GetClientRect();
@@ -530,7 +523,9 @@ namespace AutoExile.Systems
 
             // Named map or ForceCtrlClick (farming): Ctrl+click to insert into device slot.
             // Auto-match (boss fragments only): Right-click to auto-select node + insert.
-            bool useCtrlClick = namedMapFlow || ForceCtrlClick;
+            // Simulacrum: Ctrl+click to insert into device slot.
+            bool isSimulacrum = IsSimulacrum(targetMap);
+            bool useCtrlClick = namedMapFlow || ForceCtrlClick || isSimulacrum;
             bool clicked = useCtrlClick
                 ? BotInput.CtrlClick(absPos)
                 : BotInput.RightClick(absPos);
@@ -1115,5 +1110,6 @@ namespace AutoExile.Systems
         InProgress,
         Succeeded,
         Failed,
+        OutOfMaps,
     }
 }

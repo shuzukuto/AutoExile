@@ -35,6 +35,7 @@ namespace AutoExile.Systems
         public int DeathCount { get; set; }
         public int RunsCompleted { get; private set; }
         public int HighestWaveThisRun { get; private set; }
+        public int SessionFails { get; set; }
         public DateTime RunStartedAt { get; private set; } = DateTime.Now;
 
         // Run history for session stats
@@ -96,7 +97,7 @@ namespace AutoExile.Systems
             _lastMonolithUpdate = DateTime.MinValue;
         }
 
-        public void RecordRunComplete()
+        public void RecordRunComplete(bool isSuccess)
         {
             _runHistory.Add(new RunRecord
             {
@@ -104,6 +105,12 @@ namespace AutoExile.Systems
                 Duration = DateTime.Now - RunStartedAt,
             });
             RunsCompleted++;
+            
+            if (!isSuccess)
+            {
+                SessionFails++;
+            }
+
             HighestWaveThisRun = 0;
         }
 
