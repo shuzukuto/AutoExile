@@ -532,7 +532,23 @@ namespace AutoExile.Modes
             if (BotInput.GetEntityScreenBounds(gc, pump, out var center, out var hw, out var hh))
             {
                 var windowRect = gc.Window.GetWindowRectangle();
-                var clickPos = BotInput.RandomizeWithinRect(center.X, center.Y, hw, hh);
+                
+                // Try different parts of the pump based on attempt count to ensure we hit the clickable area
+                float offsetX = 0;
+                float offsetY = 0;
+                
+                // Pump is tall, clickable area might be slightly higher or lower than BoundsCenter
+                switch (_pumpClickAttempts % 6)
+                {
+                    case 0: break; // Center
+                    case 1: offsetY = -35f; break; // Above center
+                    case 2: offsetY = 25f;  break; // Below center
+                    case 3: offsetX = -25f; break; // Left
+                    case 4: offsetX = 25f;  break; // Right
+                    case 5: offsetY = -60f; break; // Far above center
+                }
+                
+                var clickPos = BotInput.RandomizeWithinRect(center.X + offsetX, center.Y + offsetY, hw, hh);
                 var absPos = new Vector2(windowRect.X + clickPos.X, windowRect.Y + clickPos.Y);
                 if (BotInput.Click(absPos))
                 {
