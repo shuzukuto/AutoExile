@@ -527,7 +527,19 @@ namespace AutoExile.Modes
                 }
             }
 
-            ModeHelpers.ClickEntity(gc, pump, ref _lastActionTime);
+            // The Blight Pump often does not have a Targetable component that correctly flags isTargeted.
+            // Using a raw screen click on its bounds bypasses the target verification.
+            if (BotInput.GetEntityScreenBounds(gc, pump, out var center, out var hw, out var hh))
+            {
+                var windowRect = gc.Window.GetWindowRectangle();
+                var clickPos = BotInput.RandomizeWithinRect(center.X, center.Y, hw, hh);
+                var absPos = new Vector2(windowRect.X + clickPos.X, windowRect.Y + clickPos.Y);
+                if (BotInput.Click(absPos))
+                {
+                    _lastActionTime = DateTime.Now;
+                }
+            }
+            
             _pumpClickAttempts++;
             _lastPumpClickAt = DateTime.Now;
             StatusText = $"Clicking pump to start encounter (attempt {_pumpClickAttempts}/{MaxPumpClickAttempts})";
@@ -593,7 +605,16 @@ namespace AutoExile.Modes
             try
             {
                 var mechanicButtons = gc.IngameState.IngameUi.LeagueMechanicButtons;
-                var skipButton = mechanicButtons?.Children.FirstOrDefault(c => c != null && c.IsVisible);
+                
+                // The skip button is usually a specific child, or the first one that has actual size
+                var skipButton = mechanicButtons?.GetChildAtIndex(2);
+                if (skipButton == null || !skipButton.IsVisible || skipButton.GetClientRect().Width < 10)
+                {
+                    // Fallback: search for any visible child with a valid size
+                    skipButton = mechanicButtons?.Children.FirstOrDefault(c => 
+                        c != null && c.IsVisible && c.GetClientRect().Width > 10 && c.GetClientRect().Height > 10);
+                }
+
                 if (skipButton != null)
                 {
                     var rect = skipButton.GetClientRect();
