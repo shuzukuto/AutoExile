@@ -387,12 +387,8 @@ namespace AutoExile.Modes
 
             if (_blight.IsEncounterActive)
             {
-                // Require positive proof: pump StateMachine "activated > 0", or pump gone + monsters
-                var pump = FindPumpEntity(ctx);
-                bool confirmed = (pump != null && IsPumpActivated(pump))
-                    || (pump == null && _blight.AliveMonsterCount > 5);
-
-                if (confirmed)
+                // Require positive proof: lane data has appeared
+                if (_blight.LaneTracker.HasLaneData || _blight.AliveMonsterCount > 5)
                 {
                     ctx.Navigation.Stop(ctx.Game);
                     _phase = BlightPhase.TowerManagement;
@@ -438,19 +434,7 @@ namespace AutoExile.Modes
             var gc = ctx.Game;
             Entity? pump = FindPumpEntity(ctx);
 
-            // The ONLY way to advance: positive confirmation that pump StateMachine
-            // has "activated > 0". Don't trust IsEncounterActive (non-targetable fallback
-            // can false-positive). Don't trust "pump disappeared". Require hard proof.
-            if (pump != null && IsPumpActivated(pump))
-            {
-                _phase = BlightPhase.FastForward;
-                _phaseStartTime = DateTime.Now;
-                _pumpClickAttempts = 0;
-                StatusText = "Encounter confirmed (activated) — waiting for fast-forward";
-                return;
-            }
-
-            // Secondary confirmation: If lane data exists, the encounter has definitely started.
+            // The ONLY way to advance: positive confirmation that lane data exists.
             // This is 100% reliable compared to UI flags or random monster counts.
             if (_blight.LaneTracker.HasLaneData)
             {
@@ -464,10 +448,7 @@ namespace AutoExile.Modes
             // If IsEncounterActive got set but we can't confirm it, reset the false positive
             if (_blight.IsEncounterActive && !_blight.LaneTracker.HasLaneData)
             {
-                if (pump != null && !IsPumpActivated(pump))
-                {
-                    _blight.IsEncounterActive = false;
-                }
+                _blight.IsEncounterActive = false;
             }
 
             // After clicking, wait for verification delay before retrying
@@ -611,23 +592,6 @@ namespace AutoExile.Modes
                 StatusText = "Timeout starting encounter — exiting map";
                 EnterExitMapPhase(ctx);
             }
-        }
-
-        /// <summary>
-        /// Check if pump StateMachine has "activated > 0" — the definitive proof
-        /// that the encounter has actually started. This is the ONLY reliable signal;
-        /// IsTargetable changes and other fallbacks can false-positive.
-        /// </summary>
-        private static bool IsPumpActivated(Entity pump)
-        {
-            if (!pump.TryGetComponent<StateMachine>(out var states) || states.States == null)
-                return false;
-            foreach (var s in states.States)
-            {
-                if (s.Name == "activated" && s.Value > 0)
-                    return true;
-            }
-            return false;
         }
 
         private void TickFastForward(BotContext ctx)

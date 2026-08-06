@@ -384,10 +384,6 @@ namespace AutoExile.Systems
                 // Read StateMachine immediately — don't wait for next Tick()
                 if (entity.TryGetComponent<StateMachine>(out var states))
                 {
-                    var activated = GetStateValue(states, "activated");
-                    if (activated > 0)
-                        IsEncounterActive = true;
-
                     var encounterDone = GetStateValue(states, "encounter_done");
                     var success = GetStateValue(states, "success");
                     var fail = GetStateValue(states, "fail");
@@ -405,22 +401,6 @@ namespace AutoExile.Systems
                     }
                 }
 
-                // Fallback: non-targetable pump means the encounter has been activated.
-                // The "activated" StateMachine state may not stay >0 for the entire encounter.
-                // Require sustained non-targetable to avoid transient false positives.
-                if (!IsEncounterActive)
-                {
-                    if (!entity.IsTargetable)
-                    {
-                        _pumpNonTargetableTicks++;
-                        if (_pumpNonTargetableTicks >= PumpNonTargetableThreshold)
-                            IsEncounterActive = true;
-                    }
-                    else
-                    {
-                        _pumpNonTargetableTicks = 0;
-                    }
-                }
                 break;
             }
         }
@@ -507,28 +487,6 @@ namespace AutoExile.Systems
                     if (entity.TryGetComponent<StateMachine>(out var states))
                     {
                         var activated = GetStateValue(states, "activated");
-                        if (activated > 0)
-                            IsEncounterActive = true;
-                    }
-                    // Fallback: non-targetable pump means encounter is active.
-                    // The "activated" state is a trigger that may not stay >0 for the
-                    // entire encounter — once set, IsEncounterActive should never flip back.
-                    // Require sustained non-targetable state to avoid transient false positives
-                    // (e.g., blink animations, entity refresh, momentary targeting loss).
-                    if (!IsEncounterActive)
-                    {
-                        if (!entity.IsTargetable)
-                        {
-                            _pumpNonTargetableTicks++;
-                            if (_pumpNonTargetableTicks >= PumpNonTargetableThreshold)
-                                IsEncounterActive = true;
-                        }
-                        else
-                        {
-                            _pumpNonTargetableTicks = 0;
-                        }
-                    }
-                    continue;
                 }
             }
 
@@ -556,6 +514,12 @@ namespace AutoExile.Systems
         {
             LaneTracker.PumpPosition = PumpPosition;
             LaneTracker.Tick(gc);
+
+            // Rely on LaneTracker as the single source of truth for encounter start.
+            if (LaneTracker.HasLaneData)
+            {
+                IsEncounterActive = true;
+            }
 
             if (IsEncounterActive && LaneTracker.HasLaneData)
             {
