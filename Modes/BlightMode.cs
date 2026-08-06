@@ -511,23 +511,10 @@ namespace AutoExile.Modes
                 return;
             }
 
-            if (pump.TryGetComponent<StateMachine>(out var states) && states.States != null)
+            if (!pump.IsTargetable)
             {
-                bool readyToStart = false;
-                foreach (var s in states.States)
-                {
-                    if (s.Name == "ready_to_start" && s.Value > 0)
-                    {
-                        readyToStart = true;
-                        break;
-                    }
-                }
-
-                if (!readyToStart)
-                {
-                    StatusText = "Waiting for pump to become ready...";
-                    return;
-                }
+                StatusText = "Waiting for pump to become targetable...";
+                return;
             }
 
             // The Blight Pump often does not have a Targetable component that correctly flags isTargeted.
