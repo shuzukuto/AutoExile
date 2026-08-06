@@ -57,7 +57,7 @@ namespace AutoExile.Modes
         private int _pumpClickAttempts;
         private bool _pumpRetryAttempted;
         private DateTime _lastPumpClickAt = DateTime.MinValue;
-        private const int MaxPumpClickAttempts = 6;
+        private const int MaxPumpClickAttempts = 20;
         private const float PumpClickVerifyDelayMs = 1500f; // wait after click before retrying
 
         // Action cooldown for major actions (pump click, fast-forward)
@@ -511,11 +511,7 @@ namespace AutoExile.Modes
                 return;
             }
 
-            if (!pump.IsTargetable)
-            {
-                StatusText = "Waiting for pump to become targetable...";
-                return;
-            }
+            // removed IsTargetable block so the bot clicks unconditionally
 
             // The Blight Pump entity here is actually the IngameIcon hovering above it.
             // Clicking its volumetric center often hits unclickable space.
