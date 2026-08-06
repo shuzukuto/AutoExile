@@ -978,6 +978,17 @@ namespace AutoExile.Modes
                     return;
                 }
 
+                if (ctx.Navigation.IsNavigating)
+                {
+                    if (!ctx.Navigation.IsPaused && ctx.Navigation.StuckRecoveries >= 3)
+                        ctx.Navigation.Stop(gc);
+                    else
+                    {
+                        StatusText = $"Returning to defense point (dist: {distToDefense:F0})";
+                        return;
+                    }
+                }
+
                 if (!ctx.Navigation.IsNavigating)
                     ctx.Navigation.NavigateTo(gc, defensePos);
                 StatusText = $"Returning to defense point (dist: {distToDefense:F0})";
@@ -1091,10 +1102,19 @@ namespace AutoExile.Modes
             var gc = ctx.Game;
 
             // Let current navigation finish before picking a new target
-            if (ctx.Navigation.IsNavigating)
+            if (ctx.Navigation.IsPathfinding || ctx.Navigation.IsNavigating)
             {
-                StatusText = $"Sweep: searching for monsters ({ctx.Combat.CachedMonsterCount} alive)";
-                return;
+                if (ctx.Navigation.IsNavigating && !ctx.Navigation.IsPaused && ctx.Navigation.StuckRecoveries >= 3)
+                {
+                    if (ctx.Navigation.Destination.HasValue)
+                        ctx.Exploration.MarkRegionFailed(ctx.Navigation.Destination.Value);
+                    ctx.Navigation.Stop(gc);
+                }
+                else
+                {
+                    StatusText = $"Sweep: searching for monsters ({ctx.Combat.CachedMonsterCount} alive)";
+                    return;
+                }
             }
 
             // Try exploration target. The return-to-pump timer (SweepPumpReturnSeconds)
@@ -1104,9 +1124,15 @@ namespace AutoExile.Modes
                 var target = ctx.Exploration.GetNextExplorationTarget(playerPos);
                 if (target.HasValue)
                 {
-                    ctx.Navigation.NavigateTo(gc, target.Value);
-                    StatusText = $"Sweep: exploring for monsters ({ctx.Combat.CachedMonsterCount} alive)";
-                    return;
+                    if (ctx.Navigation.NavigateTo(gc, target.Value))
+                    {
+                        StatusText = $"Sweep: exploring for monsters ({ctx.Combat.CachedMonsterCount} alive)";
+                        return;
+                    }
+                    else
+                    {
+                        ctx.Exploration.MarkRegionFailed(target.Value);
+                    }
                 }
             }
 
