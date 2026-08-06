@@ -515,29 +515,19 @@ namespace AutoExile.Modes
             var pumpScreenPos = camera.WorldToScreen(pump.PosNum);
             var windowRect = gc.Window.GetWindowRectangle();
             
-            // Try different parts around the base to ensure we hit the clickable area
-            float offsetX = 0;
-            float offsetY = 0;
-            
-            switch (_pumpClickAttempts % 6)
-            {
-                case 0: break; // Dead center of base
-                case 1: offsetY = -20f; break; // Slightly above base (lower trunk)
-                case 2: offsetX = -15f; break; // Left of base
-                case 3: offsetX = 15f;  break; // Right of base
-                case 4: offsetY = -40f; break; // Higher up trunk
-                case 5: offsetY = 15f;  break; // Slightly below base
-            }
-            
-            var absPos = new Vector2(windowRect.X + pumpScreenPos.X + offsetX, windowRect.Y + pumpScreenPos.Y + offsetY);
+            var absPos = new Vector2(windowRect.X + pumpScreenPos.X, windowRect.Y + pumpScreenPos.Y);
             if (BotInput.Click(absPos))
             {
                 _lastActionTime = DateTime.Now;
+                _pumpClickAttempts++;
+                _lastPumpClickAt = DateTime.Now;
+                StatusText = $"Clicking pump to start encounter (attempt {_pumpClickAttempts}/{MaxPumpClickAttempts})";
             }
-            
-            _pumpClickAttempts++;
-            _lastPumpClickAt = DateTime.Now;
-            StatusText = $"Clicking pump to start encounter (attempt {_pumpClickAttempts}/{MaxPumpClickAttempts})";
+            else
+            {
+                // CanAct is false (maybe still recovering from movement)
+                StatusText = "Waiting for input readiness to click pump...";
+            }
 
             if ((DateTime.Now - _phaseStartTime).TotalSeconds > 30)
             {
