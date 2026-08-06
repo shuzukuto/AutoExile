@@ -51,6 +51,8 @@ namespace AutoExile.Modes
         // Combat stuck detection (same pattern as SimulacrumMode)
         private DateTime _sweepCombatEngageTime = DateTime.MinValue;
         private int _sweepCombatEngageCount;
+        private DateTime _sweepCombatIgnoreUntil = DateTime.MinValue;
+        private Vector2? _lastExploreTarget = null;
         private const float SweepCombatStuckSeconds = 15f;
 
         // Pump click verification
@@ -912,15 +914,6 @@ namespace AutoExile.Modes
         // =================================================================
         // Sweep — hunt cached monsters, explore for stragglers, return to pump periodically
         // =================================================================
-
-        private DateTime _sweepLastOutsidePumpAt = DateTime.MinValue;
-        private DateTime _sweepLastMonsterSeenAt = DateTime.MinValue;
-        private bool _sweepReturningToPump;
-        private DateTime _sweepCombatEngageTime = DateTime.MinValue;
-        private int _sweepCombatEngageCount;
-        private DateTime _sweepCombatIgnoreUntil = DateTime.MinValue;
-        private Vector2? _lastExploreTarget = null;
-        private const float SweepCombatStuckSeconds = 15f;
 
         private void EnterSweepPhase()
         {
