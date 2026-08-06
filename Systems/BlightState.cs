@@ -522,7 +522,7 @@ namespace AutoExile.Systems
             // Also update from cached PumpEntityId if we can't find it in OnlyValidEntities
             if (PumpEntityId != 0 && !IsEncounterDone)
             {
-                var pump = gc.EntityListWrapper.GetEntityById((uint)PumpEntityId);
+                var pump = gc.EntityListWrapper.OnlyValidEntities.FirstOrDefault(e => e.Id == PumpEntityId);
                 if (pump != null && pump.TryGetComponent<StateMachine>(out var states))
                 {
                     var encounterDone = GetStateValue(states, "encounter_done");
