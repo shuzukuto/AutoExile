@@ -408,7 +408,7 @@ namespace AutoExile.Modes
             var playerPos = ctx.Game.Player.GridPosNum;
             var dist = Vector2.Distance(playerPos, _blight.PumpPosition.Value);
 
-            if (dist < 18f)
+            if (dist < 35f)
             {
                 ctx.Navigation.Stop(ctx.Game);
                 _phase = BlightPhase.StartEncounter;
@@ -921,7 +921,7 @@ namespace AutoExile.Modes
             if (_sweepReturningToPump || awayTooLong)
             {
                 _sweepReturningToPump = true;
-                if (distToDefense < 18f)
+                if (distToDefense < 35f)
                 {
                     // Arrived at pump — reset and resume sweep
                     _sweepReturningToPump = false;
