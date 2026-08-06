@@ -511,9 +511,8 @@ namespace AutoExile.Systems
                                 IsTimerDone = true;
                                 EncounterSucceeded = success > 0;
                                 if (!EncounterSucceeded)
-                                    Logger.Error("Blight encounter failed! Pump was destroyed.");
-                                else
-                                    Logger.Info("Blight encounter succeeded!");
+                                    SessionFails++;
+                                TimerDoneAt ??= DateTime.Now;
                             }
                         }
                     }
@@ -523,7 +522,7 @@ namespace AutoExile.Systems
             // Also update from cached PumpEntityId if we can't find it in OnlyValidEntities
             if (PumpEntityId != 0 && !IsEncounterDone)
             {
-                var pump = gc.EntityListWrapper.GetEntityById(PumpEntityId);
+                var pump = gc.EntityListWrapper.GetEntityById((uint)PumpEntityId);
                 if (pump != null && pump.TryGetComponent<StateMachine>(out var states))
                 {
                     var encounterDone = GetStateValue(states, "encounter_done");
@@ -543,9 +542,8 @@ namespace AutoExile.Systems
                             IsTimerDone = true;
                             EncounterSucceeded = success > 0;
                             if (!EncounterSucceeded)
-                                Logger.Error("Blight encounter failed! Pump was destroyed.");
-                            else
-                                Logger.Info("Blight encounter succeeded!");
+                                SessionFails++;
+                            TimerDoneAt ??= DateTime.Now;
                         }
                     }
                 }
