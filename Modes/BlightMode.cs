@@ -483,23 +483,18 @@ namespace AutoExile.Modes
 
             if (_pumpClickAttempts >= MaxPumpClickAttempts)
             {
-                if (!_pumpRetryAttempted)
-                {
-                    _pumpRetryAttempted = true;
-                    _pumpClickAttempts = 0;
-                    _phaseStartTime = DateTime.Now;
+                _pumpClickAttempts = 0;
+                _phaseStartTime = DateTime.Now;
 
-                    var playerPos = ctx.Game.Player.GridPosNum;
-                    var pumpPos = pump?.GridPosNum ?? _blight.PumpPosition ?? playerPos;
-                    var offset = Vector2.Normalize(playerPos - pumpPos);
-                    if (offset.LengthSquared() < 0.1f) offset = new Vector2(1, 1);
+                var pumpPos = pump?.GridPosNum ?? _blight.PumpPosition ?? ctx.Game.Player.GridPosNum;
+                
+                // Pick a random angle to walk to a new spot around the pump
+                var randomAngle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
+                var offset = new Vector2((float)Math.Cos(randomAngle), (float)Math.Sin(randomAngle));
+                var newPos = pumpPos + offset * 40f;
 
-                    ctx.Navigation.NavigateTo(ctx.Game, playerPos + offset * 30f);
-                    StatusText = "Failed to click pump — repositioning for retry";
-                    return;
-                }
-                StatusText = $"Failed to start encounter after {MaxPumpClickAttempts} click attempts — exiting map";
-                EnterExitMapPhase(ctx);
+                ctx.Navigation.NavigateTo(ctx.Game, newPos);
+                StatusText = "Failed to click pump — repositioning around pump to retry";
                 return;
             }
 
