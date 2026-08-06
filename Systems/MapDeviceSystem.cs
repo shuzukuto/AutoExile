@@ -85,6 +85,8 @@ namespace AutoExile.Systems
 
         // Portal spawn settle
         private DateTime? _portalFirstSeenAt;
+        private bool _sawEmptyPortals;
+        private Element? _lastHoveredElement;
 
         private bool CanAct() =>
             BotInput.CanAct && (DateTime.Now - _lastActionTime).TotalMilliseconds >= ActionCooldownMs;
@@ -684,6 +686,7 @@ namespace AutoExile.Systems
                 // Atlas closed — portals may have spawned
                 _phase = MapDevicePhase.WaitForPortals;
                 _phaseStartTime = DateTime.Now;
+                _sawEmptyPortals = false;
                 Status = "Atlas closed — waiting for portals";
                 return MapDeviceResult.InProgress;
             }
@@ -734,6 +737,26 @@ namespace AutoExile.Systems
             }
 
             var portal = FindNearestPortal(gc);
+
+            if (!_sawEmptyPortals)
+            {
+                if (portal == null)
+                {
+                    _sawEmptyPortals = true;
+                    Status = "Old portals cleared — waiting for new portals...";
+                }
+                else
+                {
+                    Status = "Waiting for old portals to clear...";
+                    // Failsafe: if old portals never clear after 5 seconds, assume they are the new ones
+                    if ((DateTime.Now - _phaseStartTime).TotalSeconds > 5)
+                    {
+                        _sawEmptyPortals = true;
+                    }
+                }
+                return MapDeviceResult.InProgress;
+            }
+
             if (portal != null)
             {
                 // Wait 1s after first portal appears for all 6 to spawn,

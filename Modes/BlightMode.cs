@@ -509,13 +509,15 @@ namespace AutoExile.Modes
             // removed IsTargetable block so the bot clicks unconditionally
 
             // The Blight Pump entity here is actually the IngameIcon hovering above it.
-            // Clicking its volumetric center often hits unclickable space.
-            // We must click its ground position (PosNum) which corresponds to the base of the pump.
-            var camera = gc.IngameState.Camera;
-            var pumpScreenPos = camera.WorldToScreen(pump.PosNum);
-            var windowRect = gc.Window.GetWindowRectangle();
+            // Using its BoundsCenterPosNum via GetEntityScreenBounds gives the most reliable 2D screen coordinate.
+            if (!BotInput.GetEntityScreenBounds(gc, pump, out var center, out _, out _))
+            {
+                StatusText = "Failed to project pump bounds to screen";
+                return;
+            }
             
-            var absPos = new Vector2(windowRect.X + pumpScreenPos.X, windowRect.Y + pumpScreenPos.Y);
+            var windowRect = gc.Window.GetWindowRectangle();
+            var absPos = new Vector2(windowRect.X + center.X, windowRect.Y + center.Y);
             if (BotInput.Click(absPos))
             {
                 _lastActionTime = DateTime.Now;
