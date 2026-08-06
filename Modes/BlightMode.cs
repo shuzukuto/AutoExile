@@ -508,16 +508,52 @@ namespace AutoExile.Modes
 
             // removed IsTargetable block so the bot clicks unconditionally
 
-            // The Blight Pump entity here is actually the IngameIcon hovering above it.
-            // Using its BoundsCenterPosNum via GetEntityScreenBounds gives the most reliable 2D screen coordinate.
-            if (!BotInput.GetEntityScreenBounds(gc, pump, out var center, out _, out _))
+            // 1. First priority: LeagueMechanicButtons (the UI Start/Skip panel)
+            // The user noted a panel appears when the pump is unclickable or failing.
+            var mechanicButtons = gc.IngameState.IngameUi.LeagueMechanicButtons;
+            var startBtn = mechanicButtons?.GetChildAtIndex(2) ?? mechanicButtons?.Children.FirstOrDefault(c => c != null && c.IsVisible && c.GetClientRect().Width > 10 && c.GetClientRect().Height > 10);
+            
+            if (startBtn != null && _pumpClickAttempts > 0)
             {
-                StatusText = "Failed to project pump bounds to screen";
+                var rect = startBtn.GetClientRect();
+                var btnCenter = new Vector2(rect.Center.X, rect.Center.Y);
+                if (DoClickRelative(gc, btnCenter))
+                {
+                    _lastActionTime = DateTime.Now;
+                    _pumpClickAttempts++;
+                    _lastPumpClickAt = DateTime.Now;
+                    StatusText = $"Clicking start panel fallback (attempt {_pumpClickAttempts}/{MaxPumpClickAttempts})";
+                    return;
+                }
+            }
+
+            // 2. Second priority: 3D bounding box center
+            Vector2 clickPos = Vector2.Zero;
+            bool gotPos = false;
+
+            if (BotInput.GetEntityScreenBounds(gc, pump, out var boundsCenter, out _, out _))
+            {
+                clickPos = boundsCenter;
+                gotPos = true;
+            }
+            else if (_blight.PumpWorldPos.HasValue)
+            {
+                // 3. Fallback: Project the 3D ground position and shift Y UP to hit the floating panel
+                var camera = gc.IngameState.Camera;
+                clickPos = camera.WorldToScreen(_blight.PumpWorldPos.Value);
+                // The floating panel "phía trên pump" is physically above the ground position
+                clickPos.Y -= 60f; 
+                gotPos = true;
+            }
+
+            if (!gotPos)
+            {
+                StatusText = "Failed to project pump bounds or find world position";
                 return;
             }
             
             var windowRect = gc.Window.GetWindowRectangle();
-            var absPos = new Vector2(windowRect.X + center.X, windowRect.Y + center.Y);
+            var absPos = new Vector2(windowRect.X + clickPos.X, windowRect.Y + clickPos.Y);
             if (BotInput.Click(absPos))
             {
                 _lastActionTime = DateTime.Now;
