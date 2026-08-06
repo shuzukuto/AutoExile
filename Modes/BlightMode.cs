@@ -913,6 +913,15 @@ namespace AutoExile.Modes
         // Sweep — hunt cached monsters, explore for stragglers, return to pump periodically
         // =================================================================
 
+        private DateTime _sweepLastOutsidePumpAt = DateTime.MinValue;
+        private DateTime _sweepLastMonsterSeenAt = DateTime.MinValue;
+        private bool _sweepReturningToPump;
+        private DateTime _sweepCombatEngageTime = DateTime.MinValue;
+        private int _sweepCombatEngageCount;
+        private DateTime _sweepCombatIgnoreUntil = DateTime.MinValue;
+        private Vector2? _lastExploreTarget = null;
+        private const float SweepCombatStuckSeconds = 15f;
+
         private void EnterSweepPhase()
         {
             _phase = BlightPhase.Sweep;
@@ -923,6 +932,8 @@ namespace AutoExile.Modes
             _sweepReturningToPump = false;
             _sweepCombatEngageTime = DateTime.MinValue;
             _sweepCombatEngageCount = 0;
+            _sweepCombatIgnoreUntil = DateTime.MinValue;
+            _lastExploreTarget = null;
         }
 
         private void TickSweep(BotContext ctx)
@@ -1006,7 +1017,7 @@ namespace AutoExile.Modes
             }
 
             // --- Priority 1: Fight nearby monsters ---
-            if (ctx.Combat.NearbyMonsterCount > 0)
+            if (ctx.Combat.NearbyMonsterCount > 0 && now > _sweepCombatIgnoreUntil)
             {
                 _sweepLastMonsterSeenAt = now;
 
@@ -1023,6 +1034,8 @@ namespace AutoExile.Modes
                     // Stuck fighting same monsters too long — explore elsewhere
                     _sweepCombatEngageTime = DateTime.MinValue;
                     _sweepCombatEngageCount = 0;
+                    _sweepCombatIgnoreUntil = now.AddSeconds(15);
+                    
                     if (!_sweepWasSearching)
                     {
                         _sweepWasSearching = true;
@@ -1030,7 +1043,7 @@ namespace AutoExile.Modes
                             ctx.Exploration.ResetSeen();
                     }
                     StatusText = $"Combat stuck ({combatElapsed:F0}s) — moving on ({ctx.Combat.NearbyMonsterCount} unreachable)";
-                    TickSweepExplore(ctx, playerPos, defensePos);
+                    // Fall through to exploration
                 }
                 else
                 {
@@ -1039,8 +1052,8 @@ namespace AutoExile.Modes
                         ctx.Navigation.Stop(gc);
                     // CombatSystem handles fighting + positioning (SuppressPositioning = false above)
                     StatusText = $"Sweep: fighting ({ctx.Combat.NearbyMonsterCount} nearby, {ctx.Combat.CachedMonsterCount} total)";
+                    return;
                 }
-                return;
             }
 
             // --- Priority 2: Chase cached distant monsters (closest to pump first) ---
@@ -1117,6 +1130,14 @@ namespace AutoExile.Modes
                 }
             }
 
+            // If we had a target but pathfinding/navigating finished without success (IsNavigating is false),
+            // it means the asynchronous pathfinding failed to find a path.
+            if (_lastExploreTarget.HasValue && !ctx.Navigation.IsPathfinding && !ctx.Navigation.IsNavigating)
+            {
+                ctx.Exploration.MarkRegionFailed(_lastExploreTarget.Value);
+                _lastExploreTarget = null;
+            }
+
             // Try exploration target. The return-to-pump timer (SweepPumpReturnSeconds)
             // ensures we don't stay away from the defense point for too long.
             if (ctx.Exploration.IsInitialized)
@@ -1124,6 +1145,7 @@ namespace AutoExile.Modes
                 var target = ctx.Exploration.GetNextExplorationTarget(playerPos);
                 if (target.HasValue)
                 {
+                    _lastExploreTarget = target.Value;
                     if (ctx.Navigation.NavigateTo(gc, target.Value))
                     {
                         StatusText = $"Sweep: exploring for monsters ({ctx.Combat.CachedMonsterCount} alive)";
@@ -1132,6 +1154,7 @@ namespace AutoExile.Modes
                     else
                     {
                         ctx.Exploration.MarkRegionFailed(target.Value);
+                        _lastExploreTarget = null;
                     }
                 }
             }
