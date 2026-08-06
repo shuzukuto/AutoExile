@@ -387,7 +387,12 @@ namespace AutoExile.Systems
                     var encounterDone = GetStateValue(states, "encounter_done");
                     var success = GetStateValue(states, "success");
                     var fail = GetStateValue(states, "fail");
-                    if (encounterDone > 0 || success > 0 || fail > 0)
+                    if (encounterDone > 0 && !IsTimerDone)
+                    {
+                        IsTimerDone = true;
+                    }
+
+                    if (success > 0 || fail > 0)
                     {
                         if (!IsEncounterDone)
                         {
@@ -487,6 +492,61 @@ namespace AutoExile.Systems
                     if (entity.TryGetComponent<StateMachine>(out var states))
                     {
                         var activated = GetStateValue(states, "activated");
+                        var encounterDone = GetStateValue(states, "encounter_done");
+                        var success = GetStateValue(states, "success");
+                        var fail = GetStateValue(states, "fail");
+
+                        // When timer ends and monsters stop spawning, encounter_done becomes > 0
+                        if (encounterDone > 0 && !IsTimerDone)
+                        {
+                            IsTimerDone = true;
+                        }
+
+                        // The encounter is only truly DONE when it reports success or fail
+                        if (success > 0 || fail > 0)
+                        {
+                            if (!IsEncounterDone)
+                            {
+                                IsEncounterDone = true;
+                                IsTimerDone = true;
+                                EncounterSucceeded = success > 0;
+                                if (!EncounterSucceeded)
+                                    Logger.Error("Blight encounter failed! Pump was destroyed.");
+                                else
+                                    Logger.Info("Blight encounter succeeded!");
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Also update from cached PumpEntityId if we can't find it in OnlyValidEntities
+            if (PumpEntityId != 0 && !IsEncounterDone)
+            {
+                var pump = gc.EntityListWrapper.GetEntityById(PumpEntityId);
+                if (pump != null && pump.TryGetComponent<StateMachine>(out var states))
+                {
+                    var encounterDone = GetStateValue(states, "encounter_done");
+                    var success = GetStateValue(states, "success");
+                    var fail = GetStateValue(states, "fail");
+
+                    if (encounterDone > 0 && !IsTimerDone)
+                    {
+                        IsTimerDone = true;
+                    }
+
+                    if (success > 0 || fail > 0)
+                    {
+                        if (!IsEncounterDone)
+                        {
+                            IsEncounterDone = true;
+                            IsTimerDone = true;
+                            EncounterSucceeded = success > 0;
+                            if (!EncounterSucceeded)
+                                Logger.Error("Blight encounter failed! Pump was destroyed.");
+                            else
+                                Logger.Info("Blight encounter succeeded!");
+                        }
                     }
                 }
             }
@@ -620,7 +680,12 @@ namespace AutoExile.Systems
                 var success = GetStateValue(states, "success");
                 var fail = GetStateValue(states, "fail");
 
-                if (encounterDone > 0 || success > 0 || fail > 0)
+                if (encounterDone > 0 && !IsTimerDone)
+                {
+                    IsTimerDone = true;
+                }
+
+                if (success > 0 || fail > 0)
                 {
                     if (!IsEncounterDone)
                     {
