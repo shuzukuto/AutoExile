@@ -450,21 +450,24 @@ namespace AutoExile.Modes
                 return;
             }
 
-            // Secondary confirmation: pump entity gone + monsters spawning = encounter started
-            // (pump entity can unload from entity list after activation)
-            if (pump == null && _blight.IsEncounterActive && _blight.AliveMonsterCount > 5)
+            // Secondary confirmation: If lane data exists, the encounter has definitely started.
+            // This is 100% reliable compared to UI flags or random monster counts.
+            if (_blight.LaneTracker.HasLaneData)
             {
                 _phase = BlightPhase.FastForward;
                 _phaseStartTime = DateTime.Now;
                 _pumpClickAttempts = 0;
-                StatusText = "Encounter confirmed (monsters spawning) — waiting for fast-forward";
+                StatusText = "Encounter confirmed (lanes appeared) — waiting for fast-forward";
                 return;
             }
 
             // If IsEncounterActive got set but we can't confirm it, reset the false positive
-            if (_blight.IsEncounterActive && pump != null && !IsPumpActivated(pump))
+            if (_blight.IsEncounterActive && !_blight.LaneTracker.HasLaneData)
             {
-                _blight.IsEncounterActive = false;
+                if (pump != null && !IsPumpActivated(pump))
+                {
+                    _blight.IsEncounterActive = false;
+                }
             }
 
             // After clicking, wait for verification delay before retrying

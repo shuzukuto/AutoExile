@@ -439,8 +439,37 @@ namespace AutoExile
             }
         }
 
+        private bool _offsetsDumped = false;
         public override Job Tick()
         {
+            if (!_offsetsDumped)
+            {
+                _offsetsDumped = true;
+                try
+                {
+                    var sb = new System.Text.StringBuilder();
+                    var asm = typeof(GameOffsets.Native.IngameUIElementsOffsets).Assembly;
+                    foreach (var type in asm.GetTypes().Where(t => t.Name.Contains("Offset") || t.Name.Contains("Resurrect") || t.Name.Contains("Blight") || t.Name.Contains("Mechanic")))
+                    {
+                        sb.AppendLine($"--- {type.Name} ---");
+                        foreach (var field in type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance))
+                        {
+                            var attr = field.GetCustomAttributes(typeof(System.Runtime.InteropServices.FieldOffsetAttribute), false).FirstOrDefault() as System.Runtime.InteropServices.FieldOffsetAttribute;
+                            if (attr != null)
+                            {
+                                sb.AppendLine($"[FieldOffset(0x{attr.Value:X})] {field.Name}");
+                            }
+                        }
+                    }
+                    System.IO.File.WriteAllText(@"E:\Path of Exile\POE Tools\ExileApi\offsets_dump.txt", sb.ToString());
+                    LogMessage("[AutoExile] Offsets dumped to offsets_dump.txt");
+                }
+                catch (Exception e)
+                {
+                    LogMessage($"[AutoExile] Error dumping offsets: {e}");
+                }
+            }
+
             // Web server must run unconditionally — commands and status must work
             // even when the plugin is disabled or the game is not in a map.
             TickWebServer();
