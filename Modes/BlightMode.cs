@@ -517,33 +517,31 @@ namespace AutoExile.Modes
                 return;
             }
 
-            // The Blight Pump often does not have a Targetable component that correctly flags isTargeted.
-            // Using a raw screen click on its bounds bypasses the target verification.
-            if (BotInput.GetEntityScreenBounds(gc, pump, out var center, out var hw, out var hh))
+            // The Blight Pump entity here is actually the IngameIcon hovering above it.
+            // Clicking its volumetric center often hits unclickable space.
+            // We must click its ground position (PosNum) which corresponds to the base of the pump.
+            var camera = gc.IngameState.Camera;
+            var pumpScreenPos = camera.WorldToScreen(pump.PosNum);
+            var windowRect = gc.Window.GetWindowRectangle();
+            
+            // Try different parts around the base to ensure we hit the clickable area
+            float offsetX = 0;
+            float offsetY = 0;
+            
+            switch (_pumpClickAttempts % 6)
             {
-                var windowRect = gc.Window.GetWindowRectangle();
-                
-                // Try different parts of the pump based on attempt count to ensure we hit the clickable area
-                float offsetX = 0;
-                float offsetY = 0;
-                
-                // Pump is tall, clickable area might be slightly higher or lower than BoundsCenter
-                switch (_pumpClickAttempts % 6)
-                {
-                    case 0: break; // Center
-                    case 1: offsetY = -35f; break; // Above center
-                    case 2: offsetY = 25f;  break; // Below center
-                    case 3: offsetX = -25f; break; // Left
-                    case 4: offsetX = 25f;  break; // Right
-                    case 5: offsetY = -60f; break; // Far above center
-                }
-                
-                var clickPos = BotInput.RandomizeWithinRect(center.X + offsetX, center.Y + offsetY, hw, hh);
-                var absPos = new Vector2(windowRect.X + clickPos.X, windowRect.Y + clickPos.Y);
-                if (BotInput.Click(absPos))
-                {
-                    _lastActionTime = DateTime.Now;
-                }
+                case 0: break; // Dead center of base
+                case 1: offsetY = -20f; break; // Slightly above base (lower trunk)
+                case 2: offsetX = -15f; break; // Left of base
+                case 3: offsetX = 15f;  break; // Right of base
+                case 4: offsetY = -40f; break; // Higher up trunk
+                case 5: offsetY = 15f;  break; // Slightly below base
+            }
+            
+            var absPos = new Vector2(windowRect.X + pumpScreenPos.X + offsetX, windowRect.Y + pumpScreenPos.Y + offsetY);
+            if (BotInput.Click(absPos))
+            {
+                _lastActionTime = DateTime.Now;
             }
             
             _pumpClickAttempts++;
