@@ -487,6 +487,7 @@ namespace AutoExile.Systems
                     if (entity.TryGetComponent<StateMachine>(out var states))
                     {
                         var activated = GetStateValue(states, "activated");
+                    }
                 }
             }
 
