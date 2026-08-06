@@ -508,7 +508,31 @@ namespace AutoExile.Modes
 
             // removed IsTargetable block so the bot clicks unconditionally
 
-            // 1. First priority: LeagueMechanicButtons (the UI Start/Skip panel)
+            // 0. Highest priority: The actual ground label ("bảng" / Nameplate)
+            // The pump has an interactable label (e.g. "ICHOR PUMP" / "INTERACT TO BEGIN BLIGHT ENCOUNTER")
+            var groundLabels = gc.IngameState.IngameUi.ItemsOnGroundLabelElement.VisibleGroundItemLabels;
+            var pumpLabel = groundLabels?.FirstOrDefault(x =>
+                x.Label != null && x.Label.IsVisible &&
+                (x.Entity?.Id == pump.Id || 
+                 (x.Entity?.Path != null && x.Entity.Path.EndsWith("/BlightPump")) ||
+                 (x.Label.Text != null && x.Label.Text.Contains("ICHOR PUMP", StringComparison.OrdinalIgnoreCase)))
+            );
+
+            if (pumpLabel != null)
+            {
+                var rect = pumpLabel.ClientRect;
+                var labelCenter = new Vector2(rect.Center.X, rect.Center.Y);
+                if (BotInput.Click(labelCenter))
+                {
+                    _lastActionTime = DateTime.Now;
+                    _pumpClickAttempts++;
+                    _lastPumpClickAt = DateTime.Now;
+                    StatusText = $"Clicking ICHOR PUMP label (attempt {_pumpClickAttempts}/{MaxPumpClickAttempts})";
+                    return;
+                }
+            }
+
+            // 1. First fallback: LeagueMechanicButtons (the UI Start/Skip panel)
             // The user noted a panel appears when the pump is unclickable or failing.
             var mechanicButtons = gc.IngameState.IngameUi.LeagueMechanicButtons;
             var startBtn = mechanicButtons?.GetChildAtIndex(2) ?? mechanicButtons?.Children.FirstOrDefault(c => c != null && c.IsVisible && c.GetClientRect().Width > 10 && c.GetClientRect().Height > 10);
