@@ -429,6 +429,23 @@ namespace AutoExile.Modes
             StatusText = $"Navigating to pump (dist: {dist:F0})";
         }
 
+        private static Element? FindElementByText(Element element, string text, int maxDepth)
+        {
+            if (element == null || !element.IsVisible || maxDepth < 0) return null;
+            if (element.Text != null && element.Text.Contains(text, StringComparison.OrdinalIgnoreCase)) return element;
+            for (int i = 0; i < element.ChildCount; i++)
+            {
+                var found = FindElementByText(element.GetChildAtIndex(i), text, maxDepth - 1);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private static bool HasText(Element element, string text)
+        {
+            return FindElementByText(element, text, 3) != null;
+        }
+
         private void TickStartEncounter(BotContext ctx)
         {
             var gc = ctx.Game;
@@ -457,7 +474,7 @@ namespace AutoExile.Modes
                 var msSinceClick = (DateTime.Now - _lastPumpClickAt).TotalMilliseconds;
                 if (msSinceClick < PumpClickVerifyDelayMs)
                 {
-                    StatusText = $"Verifying pump click ({_pumpClickAttempts}/{MaxPumpClickAttempts}, {msSinceClick:F0}ms)...";
+                    StatusText = $"Verifying pump click... ({(int)(PumpClickVerifyDelayMs - msSinceClick)}ms)";
                     return;
                 }
             }
@@ -481,34 +498,34 @@ namespace AutoExile.Modes
 
             if (!ModeHelpers.CanAct(_lastActionTime, MajorActionCooldownMs)) return;
 
-            if (pump == null)
-            {
-                StatusText = "Pump entity not found for clicking";
-                return;
-            }
-
-            // removed IsTargetable block so the bot clicks unconditionally
-
             // 0. Highest priority: The actual ground label ("bảng" / Nameplate)
-            // The pump has an interactable label (e.g. "ICHOR PUMP" / "INTERACT TO BEGIN BLIGHT ENCOUNTER")
             var groundLabels = gc.IngameState.IngameUi.ItemsOnGroundLabelElement.VisibleGroundItemLabels;
             var pumpLabel = groundLabels?.FirstOrDefault(x =>
                 x.Label != null && x.Label.IsVisible &&
-                (x.Entity?.Id == pump.Id || 
+                (x.Entity?.Id == pump?.Id || 
                  (x.Entity?.Path != null && x.Entity.Path.EndsWith("/BlightPump")) ||
-                 (x.Label.Text != null && x.Label.Text.Contains("ICHOR PUMP", StringComparison.OrdinalIgnoreCase)))
+                 HasText(x.Label, "ICHOR PUMP") || HasText(x.Label, "BLIGHT ENCOUNTER"))
             );
 
-            if (pumpLabel != null)
+            Element? targetLabelElement = pumpLabel?.Label;
+
+            // 0.5. If not in ground labels, search IngameUi recursively for the interaction panel
+            if (targetLabelElement == null)
             {
-                var rect = pumpLabel.ClientRect;
+                targetLabelElement = FindElementByText(gc.IngameState.IngameUi, "BLIGHT ENCOUNTER", 10) 
+                                  ?? FindElementByText(gc.IngameState.IngameUi, "ICHOR PUMP", 10);
+            }
+
+            if (targetLabelElement != null)
+            {
+                var rect = targetLabelElement.GetClientRect();
                 var labelCenter = new Vector2(rect.Center.X, rect.Center.Y);
                 if (BotInput.Click(labelCenter))
                 {
                     _lastActionTime = DateTime.Now;
                     _pumpClickAttempts++;
                     _lastPumpClickAt = DateTime.Now;
-                    StatusText = $"Clicking ICHOR PUMP label (attempt {_pumpClickAttempts}/{MaxPumpClickAttempts})";
+                    StatusText = $"Clicking ICHOR PUMP UI (attempt {_pumpClickAttempts}/{MaxPumpClickAttempts})";
                     return;
                 }
             }
